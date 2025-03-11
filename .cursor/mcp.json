@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "milvus": {
+      "command": "/Users/stephen/.local/bin/uv",
+      "args": [
+        "--directory",
+        "/Users/stephen/Documents/Zilliz/mcp-server-milvus/src/mcp_server_milvus",
+        "run",
+        "server.py",
+        "--milvus-uri",
+        "http://127.0.0.1:19530"
+      ]
+    }
+  }
+} 
