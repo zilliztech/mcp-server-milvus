@@ -19,7 +19,7 @@ The recommended way to use this MCP server is to run it directly with `uv` witho
 If you want to clone the repository:
 
 ```bash
-git clone https://github.com/stephen37/mcp-server-milvus.git
+git clone https://github.com/zilliztech/mcp-server-milvus.git
 cd mcp-server-milvus
 ```
 
@@ -370,6 +370,6 @@ If the MCP tools don't appear in Claude Desktop or Cursor:
 
 If you continue to experience issues:
 
-1. Check the [GitHub Issues](https://github.com/stephen37/mcp-server-milvus/issues) for similar problems
+1. Check the [GitHub Issues](https://github.com/zilliztech/mcp-server-milvus/issues) for similar problems
 2. Join the [Zilliz Community Discord](https://discord.gg/zilliz) for support
 3. File a new issue with detailed information about your problem
