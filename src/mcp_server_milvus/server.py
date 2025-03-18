@@ -1,14 +1,14 @@
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Tuple
 from pymilvus import MilvusClient, DataType
-from mcp.server import Server, NotificationOptions
-from mcp.server.models import InitializationOptions
-import mcp.types as types
+from mcp.server.fastmcp import FastMCP, Context
 import click
 import asyncio
-import mcp
 import json
 import numpy as np
 from datetime import datetime
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+import os
 
 class MilvusConnector:
     def __init__(
@@ -89,13 +89,6 @@ class MilvusConnector:
             )
         except Exception as e:
             raise ValueError(f"Query failed: {str(e)}")
-
-    async def count_entities(self, collection_name: str, filter_expr: Optional[str] = None) -> int:
-        """Count entities in a collection, optionally filtered."""
-        try:
-            return self.client.count(collection_name, filter=filter_expr)
-        except Exception as e:
-            raise ValueError(f"Count failed: {str(e)}")
             
     async def vector_search(
         self,
@@ -540,989 +533,273 @@ class MilvusConnector:
             return True
         except Exception as e:
             raise ValueError(f"Failed to create dynamic field: {str(e)}")
-            
 
-def serve(
-    milvus_uri: str,
-    milvus_token: Optional[str] = None,
-    db_name: Optional[str] = "default"
-) -> Server:
+class MilvusContext:
+    def __init__(self, connector: MilvusConnector):
+        self.connector = connector
+
+@asynccontextmanager
+async def server_lifespan(server: FastMCP) -> AsyncIterator[MilvusContext]:
+    """Manage application lifecycle for Milvus connector."""
+    # Access config from server
+    config = server.config
+    print(f'config: {config}')
+    # Initialize connector
+    connector = MilvusConnector(
+        uri=config["milvus_uri"],
+        token=config.get("milvus_token"),
+        db_name=config.get("db_name", "default")
+    )
+    print(f'connector: {connector}')
+    try:
+        # Yield the context to the server
+        yield MilvusContext(connector)
+    finally:
+        # No cleanup needed for MilvusConnector
+        pass
+
+# Get configuration from environment variables with defaults
+milvus_uri = os.environ.get("MILVUS_URI", "http://localhost:19530")
+milvus_token = os.environ.get("MILVUS_TOKEN")
+db_name = os.environ.get("MILVUS_DB", "default")
+
+# Create a single connector instance
+connector = MilvusConnector(milvus_uri, milvus_token, db_name)
+
+# Create the FastMCP instance
+mcp = FastMCP("Milvus")
+print(f'mcp: {mcp}')
+
+# Resource endpoints
+@mcp.resource("collections://list")
+def list_collections() -> str:
+    """List all available collections in the Milvus database"""
+    collections = connector.client.list_collections()
+    print(f'collections: {collections}')
+    return "\n".join(collections)
+
+@mcp.resource("collections://{collection_name}/info")
+async def get_collection_info(collection_name: str) -> str:
+    """Get detailed information about a collection"""
+    info = await connector.get_collection_info(collection_name)
+    print(f'info: {info}')
+    return json.dumps(info, indent=2)
+
+@mcp.resource("collections://{collection_name}/stats")
+async def get_collection_stats(collection_name: str) -> str:
+    """Get statistics about a collection"""
+    stats = await connector.get_collection_stats(collection_name)
+    print(f'stats: {stats}')
+    return json.dumps(stats, indent=2)
+
+@mcp.resource("collections://{collection_name}/indexes")
+async def get_collection_indexes(collection_name: str) -> str:
+    """Get information about indexes in a collection"""
+    indexes = await connector.get_index_info(collection_name)
+    print(f'indexes: {indexes}')
+    return json.dumps(indexes, indent=2)
+
+# Tool endpoints
+@mcp.tool()
+async def milvus_text_search(
+    collection_name: str,
+    query_text: str,
+    limit: int = 5,
+    output_fields: Optional[List[str]] = None,
+    drop_ratio: float = 0.2
+) -> str:
     """
-    Create and configure the MCP server with Milvus tools.
+    Search for documents using full text search in a Milvus collection.
     
     Args:
-        milvus_uri: URI for Milvus server
-        milvus_token: Optional auth token
-        db_name: Database name to use
+        collection_name: Name of the collection to search
+        query_text: Text to search for
+        limit: Maximum number of results to return
+        output_fields: Fields to include in results
+        drop_ratio: Proportion of low-frequency terms to ignore (0.0-1.0)
     """
-    server = Server("milvus")
-    milvus = MilvusConnector(milvus_uri, milvus_token, db_name)
+    results = await connector.search_collection(
+        collection_name=collection_name,
+        query_text=query_text,
+        limit=limit,
+        output_fields=output_fields,
+        drop_ratio=drop_ratio
+    )
+    
+    output = f"Search results for '{query_text}' in collection '{collection_name}':\n\n"
+    for result in results:
+        output += f"{result}\n\n"
+        
+    return output
 
-    @server.list_tools()
-    async def list_tools() -> List[types.Tool]:
-        return [
-            types.Tool(
-                name="milvus-text-search",
-                description="Search for documents using full text search in a Milvus collection",
-                inputSchema={
-                    "type": "object", 
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection to search"
-                        },
-                        "query_text": {
-                            "type": "string",
-                            "description": "Text to search for"
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results to return",
-                            "default": 5
-                        },
-                        "output_fields": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Fields to include in results",
-                            "default": None
-                        },
-                        "drop_ratio": {
-                            "type": "number",
-                            "description": "Proportion of low-frequency terms to ignore (0.0-1.0)",
-                            "default": 0.2
-                        }
-                    },
-                    "required": ["collection_name", "query_text"]
-                }
-            ),
-            types.Tool(
-                name="milvus-list-collections",
-                description="List all collections in the database",
-                inputSchema={
-                    "type": "object",
-                    "properties": {}
-                }
-            ),
-            types.Tool(
-                name="milvus-collection-info",
-                description="Get detailed information about a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-query",
-                description="Query collection using filter expressions",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection to query"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Filter expression (e.g. 'age > 20')"
-                        },
-                        "output_fields": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Fields to include in results"
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results",
-                            "default": 10
-                        }
-                    },
-                    "required": ["collection_name", "filter_expr"]
-                }
-            ),
-            types.Tool(
-                name="milvus-count",
-                description="Count entities in a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Optional filter expression"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-vector-search",
-                description="Perform vector similarity search on a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection to search"
-                        },
-                        "vector": {
-                            "type": "array",
-                            "items": {"type": "number"},
-                            "description": "Query vector"
-                        },
-                        "vector_field": {
-                            "type": "string",
-                            "description": "Field containing vectors to search",
-                            "default": "vector"
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results",
-                            "default": 5
-                        },
-                        "output_fields": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Fields to include in results"
-                        },
-                        "metric_type": {
-                            "type": "string",
-                            "description": "Distance metric (COSINE, L2, IP)",
-                            "default": "COSINE"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Optional filter expression"
-                        }
-                    },
-                    "required": ["collection_name", "vector"]
-                }
-            ),
-            types.Tool(
-                name="milvus-hybrid-search",
-                description="Perform hybrid search combining vector similarity and attribute filtering",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection to search"
-                        },
-                        "vector": {
-                            "type": "array",
-                            "items": {"type": "number"},
-                            "description": "Query vector"
-                        },
-                        "vector_field": {
-                            "type": "string",
-                            "description": "Field containing vectors to search",
-                            "default": "vector"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Filter expression for metadata"
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results",
-                            "default": 5
-                        },
-                        "output_fields": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Fields to include in results"
-                        },
-                        "metric_type": {
-                            "type": "string",
-                            "description": "Distance metric (COSINE, L2, IP)",
-                            "default": "COSINE"
-                        }
-                    },
-                    "required": ["collection_name", "vector", "filter_expr"]
-                }
-            ),
-            types.Tool(
-                name="milvus-create-collection",
-                description="Create a new collection with specified schema",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name for the new collection"
-                        },
-                        "schema": {
-                            "type": "object",
-                            "description": "Collection schema definition"
-                        },
-                        "index_params": {
-                            "type": "object",
-                            "description": "Optional index parameters"
-                        }
-                    },
-                    "required": ["collection_name", "schema"]
-                }
-            ),
-            types.Tool(
-                name="milvus-insert-data",
-                description="Insert data into a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "data": {
-                            "type": "object",
-                            "description": "Dictionary mapping field names to lists of values"
-                        }
-                    },
-                    "required": ["collection_name", "data"]
-                }
-            ),
-            types.Tool(
-                name="milvus-delete-entities",
-                description="Delete entities from a collection based on filter expression",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Filter expression to select entities to delete"
-                        }
-                    },
-                    "required": ["collection_name", "filter_expr"]
-                }
-            ),
-            types.Tool(
-                name="milvus-get-collection-stats",
-                description="Get statistics about a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-multi-vector-search",
-                description="Perform vector similarity search with multiple query vectors",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of the collection to search"
-                        },
-                        "vectors": {
-                            "type": "array",
-                            "items": {
-                                "type": "array",
-                                "items": {"type": "number"}
-                            },
-                            "description": "List of query vectors"
-                        },
-                        "vector_field": {
-                            "type": "string",
-                            "description": "Field containing vectors to search",
-                            "default": "vector"
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results per query",
-                            "default": 5
-                        },
-                        "output_fields": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Fields to include in results"
-                        },
-                        "metric_type": {
-                            "type": "string",
-                            "description": "Distance metric (COSINE, L2, IP)",
-                            "default": "COSINE"
-                        },
-                        "filter_expr": {
-                            "type": "string",
-                            "description": "Optional filter expression"
-                        }
-                    },
-                    "required": ["collection_name", "vectors"]
-                }
-            ),
-            types.Tool(
-                name="milvus-create-index",
-                description="Create an index on a vector field",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "field_name": {
-                            "type": "string",
-                            "description": "Field to index"
-                        },
-                        "index_type": {
-                            "type": "string",
-                            "description": "Type of index (IVF_FLAT, HNSW, etc.)",
-                            "default": "IVF_FLAT"
-                        },
-                        "metric_type": {
-                            "type": "string",
-                            "description": "Distance metric (COSINE, L2, IP)",
-                            "default": "COSINE"
-                        },
-                        "params": {
-                            "type": "object",
-                            "description": "Additional index parameters"
-                        }
-                    },
-                    "required": ["collection_name", "field_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-bulk-insert",
-                description="Insert data in batches for better performance",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "data": {
-                            "type": "object",
-                            "description": "Dictionary mapping field names to lists of values"
-                        },
-                        "batch_size": {
-                            "type": "integer",
-                            "description": "Number of records per batch",
-                            "default": 1000
-                        }
-                    },
-                    "required": ["collection_name", "data"]
-                }
-            ),
-            types.Tool(
-                name="milvus-load-collection",
-                description="Load a collection into memory for search and query",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection to load"
-                        },
-                        "replica_number": {
-                            "type": "integer",
-                            "description": "Number of replicas",
-                            "default": 1
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-release-collection",
-                description="Release a collection from memory",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection to release"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-get-query-segment-info",
-                description="Get information about query segments",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-upsert-data",
-                description="Upsert data into a collection (insert or update if exists)",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "data": {
-                            "type": "object",
-                            "description": "Dictionary mapping field names to lists of values"
-                        }
-                    },
-                    "required": ["collection_name", "data"]
-                }
-            ),
-            types.Tool(
-                name="milvus-get-index-info",
-                description="Get information about indexes in a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "field_name": {
-                            "type": "string",
-                            "description": "Optional specific field to get index info for"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-get-collection-loading-progress",
-                description="Get the loading progress of a collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        }
-                    },
-                    "required": ["collection_name"]
-                }
-            ),
-            types.Tool(
-                name="milvus-create-dynamic-field",
-                description="Add a dynamic field to an existing collection",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "collection_name": {
-                            "type": "string",
-                            "description": "Name of collection"
-                        },
-                        "field_name": {
-                            "type": "string",
-                            "description": "Name of the new field"
-                        },
-                        "data_type": {
-                            "type": "string",
-                            "description": "Data type of the field"
-                        },
-                        "description": {
-                            "type": "string",
-                            "description": "Optional description"
-                        }
-                    },
-                    "required": ["collection_name", "field_name", "data_type"]
-                }
-            )
-        ]
+@mcp.tool()
+async def milvus_list_collections() -> str:
+    """List all collections in the database."""
+    collections = await connector.list_collections()
+    return f"Collections in database:\n{', '.join(collections)}"
 
-    @server.call_tool()
-    async def call_tool(
-        name: str,
-        arguments: dict
-    ) -> List[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-        if name == "milvus-text-search":
-            collection_name = arguments["collection_name"]
-            query_text = arguments["query_text"]
-            limit = arguments.get("limit", 5)
-            output_fields = arguments.get("output_fields")
-            drop_ratio = arguments.get("drop_ratio", 0.2)
+@mcp.tool()
+async def milvus_query(
+    collection_name: str,
+    filter_expr: str,
+    output_fields: Optional[List[str]] = None,
+    limit: int = 10
+) -> str:
+    """
+    Query collection using filter expressions.
+    
+    Args:
+        collection_name: Name of the collection to query
+        filter_expr: Filter expression (e.g. 'age > 20')
+        output_fields: Fields to include in results
+        limit: Maximum number of results
+    """
+    results = await connector.query_collection(
+        collection_name=collection_name,
+        filter_expr=filter_expr,
+        output_fields=output_fields,
+        limit=limit
+    )
+    
+    output = f"Query results for '{filter_expr}' in collection '{collection_name}':\n\n"
+    for result in results:
+        output += f"{result}\n\n"
+        
+    return output
 
-            results = await milvus.search_collection(
-                collection_name=collection_name,
-                query_text=query_text,
-                limit=limit,
-                output_fields=output_fields,
-                drop_ratio=drop_ratio
-            )
 
-            content = [
-                types.TextContent(
-                    type="text",
-                    text=f"Search results for '{query_text}' in collection '{collection_name}':"
-                )
-            ]
-            
-            for result in results:
-                content.append(
-                    types.TextContent(
-                        type="text",
-                        text=f"<r>{str(result)}<r>"
-                    )
-                )
-            
-            return content
+@mcp.tool()
+async def milvus_vector_search(
+    collection_name: str,
+    vector: List[float],
+    vector_field: str = "vector",
+    limit: int = 5,
+    output_fields: Optional[List[str]] = None,
+    metric_type: str = "COSINE",
+    filter_expr: Optional[str] = None
+) -> str:
+    """
+    Perform vector similarity search on a collection.
+    
+    Args:
+        collection_name: Name of the collection to search
+        vector: Query vector
+        vector_field: Field containing vectors to search
+        limit: Maximum number of results
+        output_fields: Fields to include in results
+        metric_type: Distance metric (COSINE, L2, IP)
+        filter_expr: Optional filter expression
+    """
+    results = await connector.vector_search(
+        collection_name=collection_name,
+        vector=vector,
+        vector_field=vector_field,
+        limit=limit,
+        output_fields=output_fields,
+        metric_type=metric_type,
+        filter_expr=filter_expr
+    )
+    
+    output = f"Vector search results for '{collection_name}':\n\n"
+    for result in results:
+        output += f"{result}\n\n"
+        
+    return output
 
-        elif name == "milvus-list-collections":
-            collections = await milvus.list_collections()
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collections in database:\n{', '.join(collections)}"
-                )
-            ]
+@mcp.tool()
+async def milvus_create_collection(
+    collection_name: str,
+    collection_schema: Dict[str, Any],
+    index_params: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Create a new collection with specified schema.
+    
+    Args:
+        collection_name: Name for the new collection
+        collection_schema: Collection schema definition
+        index_params: Optional index parameters
+    """
+    success = await connector.create_collection(
+        collection_name=collection_name,
+        schema=collection_schema,
+        index_params=index_params
+    )
+    
+    return f"Collection '{collection_name}' created successfully"
 
-        elif name == "milvus-collection-info":
-            collection_name = arguments["collection_name"]
-            info = await milvus.get_collection_info(collection_name)
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collection info for '{collection_name}':\n{str(info)}"
-                )
-            ]
+@mcp.tool()
+async def milvus_insert_data(
+    collection_name: str,
+    data: Dict[str, List[Any]]
+) -> str:
+    """
+    Insert data into a collection.
+    
+    Args:
+        collection_name: Name of collection
+        data: Dictionary mapping field names to lists of values
+    """
+    result = await connector.insert_data(
+        collection_name=collection_name,
+        data=data
+    )
+    
+    return f"Data inserted into collection '{collection_name}' with result: {str(result)}"
 
-        elif name == "milvus-query":
-            collection_name = arguments["collection_name"]
-            filter_expr = arguments["filter_expr"]
-            output_fields = arguments.get("output_fields")
-            limit = arguments.get("limit", 10)
+@mcp.tool()
+async def milvus_delete_entities(
+    collection_name: str,
+    filter_expr: str
+) -> str:
+    """
+    Delete entities from a collection based on filter expression.
+    
+    Args:
+        collection_name: Name of collection
+        filter_expr: Filter expression to select entities to delete
+    """
+    result = await connector.delete_entities(
+        collection_name=collection_name,
+        filter_expr=filter_expr
+    )
+    
+    return f"Entities deleted from collection '{collection_name}' with result: {str(result)}"
 
-            results = await milvus.query_collection(
-                collection_name=collection_name,
-                filter_expr=filter_expr,
-                output_fields=output_fields,
-                limit=limit
-            )
+@mcp.tool()
+async def milvus_load_collection(
+    collection_name: str,
+    replica_number: int = 1
+) -> str:
+    """
+    Load a collection into memory for search and query.
+    
+    Args:
+        collection_name: Name of collection to load
+        replica_number: Number of replicas
+    """
+    success = await connector.load_collection(
+        collection_name=collection_name,
+        replica_number=replica_number
+    )
+    
+    return f"Collection '{collection_name}' loaded successfully with {replica_number} replica(s)"
 
-            content = [
-                types.TextContent(
-                    type="text",
-                    text=f"Query results for '{filter_expr}' in collection '{collection_name}':"
-                )
-            ]
-            
-            for result in results:
-                content.append(
-                    types.TextContent(
-                        type="text",
-                        text=f"<r>{str(result)}<r>"
-                    )
-                )
-            
-            return content
-
-        elif name == "milvus-count":
-            collection_name = arguments["collection_name"]
-            filter_expr = arguments.get("filter_expr")
-            count = await milvus.count_entities(collection_name, filter_expr)
-            msg = f"Count for collection '{collection_name}'"
-            if filter_expr:
-                msg += f" with filter '{filter_expr}'"
-            msg += f": {count}"
-            return [types.TextContent(type="text", text=msg)]
-
-        elif name == "milvus-vector-search":
-            collection_name = arguments["collection_name"]
-            vector = arguments["vector"]
-            vector_field = arguments.get("vector_field", "vector")
-            limit = arguments.get("limit", 5)
-            output_fields = arguments.get("output_fields")
-            metric_type = arguments.get("metric_type", "COSINE")
-            filter_expr = arguments.get("filter_expr")
-
-            results = await milvus.vector_search(
-                collection_name=collection_name,
-                vector=vector,
-                vector_field=vector_field,
-                limit=limit,
-                output_fields=output_fields,
-                metric_type=metric_type,
-                filter_expr=filter_expr
-            )
-
-            content = [
-                types.TextContent(
-                    type="text",
-                    text=f"Vector search results for '{collection_name}':"
-                )
-            ]
-            
-            for result in results:
-                content.append(
-                    types.TextContent(
-                        type="text",
-                        text=f"<r>{str(result)}<r>"
-                    )
-                )
-            
-            return content
-
-        elif name == "milvus-hybrid-search":
-            collection_name = arguments["collection_name"]
-            vector = arguments["vector"]
-            vector_field = arguments.get("vector_field", "vector")
-            filter_expr = arguments["filter_expr"]
-            limit = arguments.get("limit", 5)
-            output_fields = arguments.get("output_fields")
-            metric_type = arguments.get("metric_type", "COSINE")
-
-            results = await milvus.hybrid_search(
-                collection_name=collection_name,
-                vector=vector,
-                vector_field=vector_field,
-                filter_expr=filter_expr,
-                limit=limit,
-                output_fields=output_fields,
-                metric_type=metric_type
-            )
-
-            content = [
-                types.TextContent(
-                    type="text",
-                    text=f"Hybrid search results for '{collection_name}':"
-                )
-            ]
-            
-            for result in results:
-                content.append(
-                    types.TextContent(
-                        type="text",
-                        text=f"<r>{str(result)}<r>"
-                    )
-                )
-            
-            return content
-
-        elif name == "milvus-create-collection":
-            collection_name = arguments["collection_name"]
-            schema = arguments["schema"]
-            index_params = arguments.get("index_params")
-
-            success = await milvus.create_collection(
-                collection_name=collection_name,
-                schema=schema,
-                index_params=index_params
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collection '{collection_name}' created successfully"
-                )
-            ]
-
-        elif name == "milvus-insert-data":
-            collection_name = arguments["collection_name"]
-            data = arguments["data"]
-
-            result = await milvus.insert_data(
-                collection_name=collection_name,
-                data=data
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Data inserted into collection '{collection_name}' with result: {str(result)}"
-                )
-            ]
-
-        elif name == "milvus-delete-entities":
-            collection_name = arguments["collection_name"]
-            filter_expr = arguments["filter_expr"]
-
-            result = await milvus.delete_entities(
-                collection_name=collection_name,
-                filter_expr=filter_expr
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Entities deleted from collection '{collection_name}' with result: {str(result)}"
-                )
-            ]
-
-        elif name == "milvus-get-collection-stats":
-            collection_name = arguments["collection_name"]
-
-            stats = await milvus.get_collection_stats(
-                collection_name=collection_name
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collection statistics for '{collection_name}':\n{json.dumps(stats, indent=2)}"
-                )
-            ]
-            
-        elif name == "milvus-multi-vector-search":
-            collection_name = arguments["collection_name"]
-            vectors = arguments["vectors"]
-            vector_field = arguments.get("vector_field", "vector")
-            limit = arguments.get("limit", 5)
-            output_fields = arguments.get("output_fields")
-            metric_type = arguments.get("metric_type", "COSINE")
-            filter_expr = arguments.get("filter_expr")
-
-            results = await milvus.multi_vector_search(
-                collection_name=collection_name,
-                vectors=vectors,
-                vector_field=vector_field,
-                limit=limit,
-                output_fields=output_fields,
-                metric_type=metric_type,
-                filter_expr=filter_expr
-            )
-
-            content = [
-                types.TextContent(
-                    type="text",
-                    text=f"Multi-vector search results for '{collection_name}':"
-                )
-            ]
-            
-            for i, result_group in enumerate(results):
-                content.append(
-                    types.TextContent(
-                        type="text",
-                        text=f"Results for vector {i+1}:"
-                    )
-                )
-                
-                for result in result_group:
-                    content.append(
-                        types.TextContent(
-                            type="text",
-                            text=f"<r>{str(result)}<r>"
-                        )
-                    )
-            
-            return content
-            
-        elif name == "milvus-create-index":
-            collection_name = arguments["collection_name"]
-            field_name = arguments["field_name"]
-            index_type = arguments.get("index_type", "IVF_FLAT")
-            metric_type = arguments.get("metric_type", "COSINE")
-            params = arguments.get("params")
-
-            success = await milvus.create_index(
-                collection_name=collection_name,
-                field_name=field_name,
-                index_type=index_type,
-                metric_type=metric_type,
-                params=params
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Index created successfully on field '{field_name}' in collection '{collection_name}'"
-                )
-            ]
-            
-        elif name == "milvus-bulk-insert":
-            collection_name = arguments["collection_name"]
-            data = arguments["data"]
-            batch_size = arguments.get("batch_size", 1000)
-
-            results = await milvus.bulk_insert(
-                collection_name=collection_name,
-                data=data,
-                batch_size=batch_size
-            )
-
-            total_inserted = sum(result.get("insert_count", 0) for result in results)
-            
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Bulk insert completed: {total_inserted} entities inserted into collection '{collection_name}'"
-                )
-            ]
-            
-        elif name == "milvus-load-collection":
-            collection_name = arguments["collection_name"]
-            replica_number = arguments.get("replica_number", 1)
-
-            success = await milvus.load_collection(
-                collection_name=collection_name,
-                replica_number=replica_number
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collection '{collection_name}' loaded successfully with {replica_number} replica(s)"
-                )
-            ]
-            
-        elif name == "milvus-release-collection":
-            collection_name = arguments["collection_name"]
-
-            success = await milvus.release_collection(
-                collection_name=collection_name
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Collection '{collection_name}' released successfully"
-                )
-            ]
-            
-        elif name == "milvus-get-query-segment-info":
-            collection_name = arguments["collection_name"]
-
-            info = await milvus.get_query_segment_info(
-                collection_name=collection_name
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Query segment info for collection '{collection_name}':\n{json.dumps(info, indent=2)}"
-                )
-            ]
-            
-        elif name == "milvus-upsert-data":
-            collection_name = arguments["collection_name"]
-            data = arguments["data"]
-
-            result = await milvus.upsert_data(
-                collection_name=collection_name,
-                data=data
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Data upserted into collection '{collection_name}' with result: {str(result)}"
-                )
-            ]
-            
-        elif name == "milvus-get-index-info":
-            collection_name = arguments["collection_name"]
-            field_name = arguments.get("field_name")
-
-            info = await milvus.get_index_info(
-                collection_name=collection_name,
-                field_name=field_name
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Index information for collection '{collection_name}':\n{json.dumps(info, indent=2)}"
-                )
-            ]
-            
-        elif name == "milvus-get-collection-loading-progress":
-            collection_name = arguments["collection_name"]
-
-            progress = await milvus.get_collection_loading_progress(
-                collection_name=collection_name
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Loading progress for collection '{collection_name}':\n{json.dumps(progress, indent=2)}"
-                )
-            ]
-            
-        elif name == "milvus-create-dynamic-field":
-            collection_name = arguments["collection_name"]
-            field_name = arguments["field_name"]
-            data_type = arguments["data_type"]
-            description = arguments.get("description")
-
-            success = await milvus.create_dynamic_field(
-                collection_name=collection_name,
-                field_name=field_name,
-                data_type=data_type,
-                description=description
-            )
-
-            return [
-                types.TextContent(
-                    type="text",
-                    text=f"Dynamic field '{field_name}' of type '{data_type}' created successfully in collection '{collection_name}'"
-                )
-            ]
-            
-
-    return server
-
-@click.command()
-@click.option(
-    "--milvus-uri",
-    envvar="MILVUS_URI",
-    required=True,
-    help="Milvus server URI"
-)
-@click.option(
-    "--milvus-token",
-    envvar="MILVUS_TOKEN",
-    required=False,
-    help="Milvus authentication token"
-)
-@click.option(
-    "--db-name",
-    envvar="MILVUS_DB",
-    default="default",
-    help="Milvus database name"
-)
-def main(
-    milvus_uri: str,
-    milvus_token: Optional[str],
-    db_name: str
-):
-    async def _run():
-        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-            server = serve(
-                milvus_uri,
-                milvus_token,
-                db_name
-            )
-            await server.run(
-                read_stream,
-                write_stream,
-                InitializationOptions(
-                    server_name="milvus",
-                    server_version="0.1.0",
-                    capabilities=server.get_capabilities(
-                        notification_options=NotificationOptions(),
-                        experimental_capabilities={},
-                    ),
-                ),
-            )
-
-    asyncio.run(_run())
+@mcp.tool()
+async def milvus_release_collection(
+    collection_name: str
+) -> str:
+    """
+    Release a collection from memory.
+    
+    Args:
+        collection_name: Name of collection to release
+    """
+    success = await connector.release_collection(
+        collection_name=collection_name
+    )
+    
+    return f"Collection '{collection_name}' released successfully"
 
 if __name__ == "__main__":
-    main()
+    mcp.run()
