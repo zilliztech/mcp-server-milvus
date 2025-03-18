@@ -85,7 +85,6 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -106,10 +105,10 @@ class MilvusConnector:
                 collection_name=collection_name,
                 data=[vector],
                 anns_field=vector_field,
-                param=search_params,
+                search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                expr=filter_expr,
+
             )
             return results
         except Exception as e:
@@ -120,7 +119,6 @@ class MilvusConnector:
         collection_name: str,
         vector: list[float],
         vector_field: str,
-        filter_expr: str,
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
@@ -144,10 +142,9 @@ class MilvusConnector:
                 collection_name=collection_name,
                 data=[vector],
                 anns_field=vector_field,
-                param=search_params,
+                search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                expr=filter_expr,
             )
             return results
         except Exception as e:
@@ -251,7 +248,6 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None,
         search_params: Optional[dict[str, Any]] = None,
     ) -> list[list[dict]]:
         """
@@ -275,10 +271,9 @@ class MilvusConnector:
                 collection_name=collection_name,
                 data=vectors,
                 anns_field=vector_field,
-                param=search_params,
+                search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                expr=filter_expr,
             )
             return results
         except Exception as e:
