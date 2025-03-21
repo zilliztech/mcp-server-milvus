@@ -10,6 +10,8 @@ class MilvusConnector:
     def __init__(
         self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"
     ):
+        self.uri = uri
+        self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
 
     async def list_collections(self) -> list[str]:
@@ -435,6 +437,30 @@ class MilvusConnector:
             return self.client.get_load_state(collection_name)
         except Exception as e:
             raise ValueError(f"Failed to get loading progress: {str(e)}")
+        
+    async def list_databases(self) -> list[str]:
+        """List all databases in the Milvus instance."""
+        try:
+            return self.client.list_databases()
+        except Exception as e:
+            raise ValueError(f"Failed to list databases: {str(e)}")
+
+    async def use_database(self, db_name: str) -> bool:
+        """Switch to a different database.
+        
+        Args:
+            db_name: Name of the database to use
+        """
+        try:
+            # Create a new client with the specified database
+            self.client = MilvusClient(
+                uri=self.uri, 
+                token=self.token, 
+                db_name=db_name
+            )
+            return True
+        except Exception as e:
+            raise ValueError(f"Failed to switch database: {str(e)}")
 
 
 class MilvusContext:
@@ -673,6 +699,27 @@ async def milvus_release_collection(collection_name: str, ctx: Context = None) -
 
     return f"Collection '{collection_name}' released successfully"
 
+
+@mcp.tool()
+async def milvus_list_databases(ctx: Context = None) -> str:
+    """List all databases in the Milvus instance."""
+    connector = ctx.request_context.lifespan_context.connector
+    databases = await connector.list_databases()
+    return f"Databases in Milvus instance:\n{', '.join(databases)}"
+
+
+@mcp.tool()
+async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
+    """
+    Switch to a different database.
+    
+    Args:
+        db_name: Name of the database to use
+    """
+    connector = ctx.request_context.lifespan_context.connector
+    success = await connector.use_database(db_name)
+    
+    return f"Switched to database '{db_name}' successfully"
 
 if __name__ == "__main__":
     mcp.config = {
