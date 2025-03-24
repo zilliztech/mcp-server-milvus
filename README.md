@@ -4,6 +4,8 @@
 
 This repository contains a MCP server that provides access to [Milvus](https://milvus.io/) vector database functionality.
 
+![MCP with Milvus](Claude_mcp+1080.gif)
+
 ## Prerequisites
 
 Before using this MCP server, ensure you have:
