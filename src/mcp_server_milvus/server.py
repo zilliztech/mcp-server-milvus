@@ -1,6 +1,8 @@
+import argparse
 import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
+from dotenv import load_dotenv
 
 from mcp.server.fastmcp import Context, FastMCP
 from pymilvus import DataType, MilvusClient
@@ -721,11 +723,24 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
     
     return f"Switched to database '{db_name}' successfully"
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Milvus MCP Server")
+    parser.add_argument("--milvus-uri", type=str,
+                        default="http://localhost:19530", help="Milvus server URI")
+    parser.add_argument("--milvus-token", type=str,
+                        default=None, help="Milvus authentication token")
+    parser.add_argument("--milvus-db", type=str,
+                        default="default", help="Milvus database name")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    load_dotenv()
+    args = parse_arguments()
     mcp.config = {
-        "milvus_uri": os.environ.get("MILVUS_URI", "http://localhost:19530"),
-        "milvus_token": os.environ.get("MILVUS_TOKEN"),
-        "db_name": os.environ.get("MILVUS_DB", "default"),
+        "milvus_uri": os.environ.get("MILVUS_URI", args.milvus_uri),
+        "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
+        "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
 
     mcp.run()
