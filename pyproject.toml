@@ -9,6 +9,7 @@ dependencies = [
     "pymilvus>=2.5.1",
     "click>=8.0.0",
     "ruff>=0.11.0",
+    "dotenv>=0.9.9",
 ]
 
 [project.scripts]
