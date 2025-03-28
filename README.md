@@ -36,7 +36,7 @@ uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
 
 - **Claude Desktop**: Anthropic's desktop application for Claude
-- **Cursor**: AI-powered code editor with MCP support in its Composer feature
+- **Cursor**: AI-powered code editor with MCP support
 - **Custom MCP clients**: Any application implementing the MCP client specification
 
 ## Usage with Claude Desktop
@@ -68,7 +68,7 @@ This MCP server can be used with various LLM applications that support the Model
 
 ## Usage with Cursor
 
-[Cursor also supports MCP](https://docs.cursor.com/context/model-context-protocol) tools through its Agent feature in Composer. You can add the Milvus MCP server to Cursor in two ways:
+[Cursor also supports MCP](https://docs.cursor.com/context/model-context-protocol) tools. You can add the Milvus MCP server to Cursor in two ways:
 
 ### Option 1: Using Cursor Settings UI
 
@@ -111,7 +111,7 @@ Create a `.cursor/mcp.json` file in your project root:
 
 3. Restart Cursor or reload the window
 
-After adding the server, you may need to press the refresh button in the MCP settings to populate the tool list. The Composer Agent will automatically use the Milvus tools when relevant to your queries.
+After adding the server, you may need to press the refresh button in the MCP settings to populate the tool list. The Agent will automatically use the Milvus tools when relevant to your queries.
 
 ### Verifying the Integration
 
@@ -242,7 +242,7 @@ Here are the documents I found that mention machine learning:
 
 #### Example: Creating a Collection
 
-In Cursor's Composer, you can ask:
+In Cursor, you can ask:
 
 ```
 Create a new collection called 'articles' in Milvus with fields for title (string), content (string), and a vector field (128 dimensions)
