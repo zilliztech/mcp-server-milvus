@@ -31,6 +31,14 @@ Then you can run the server directly:
 uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
 ```
 
+Alternatively you can change the .env file in the `src/mcp_server_milvus/` directory to set the environment variables and run the server with the following command:
+
+```bash
+uv run src/mcp_server_milvus/server.py
+```
+
+### Important: the .env file will have higher priority than the command line arguments.
+
 ## Supported Applications
 
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
@@ -43,9 +51,11 @@ This MCP server can be used with various LLM applications that support the Model
 
 1. Install Claude Desktop from https://claude.ai/download
 2. Open your Claude Desktop configuration:
+
    - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 3. Add the following configuration:
+
 ```json
 {
   "mcpServers": {
@@ -75,10 +85,11 @@ This MCP server can be used with various LLM applications that support the Model
 1. Go to `Cursor Settings` > `Features` > `MCP`
 2. Click on the `+ Add New MCP Server` button
 3. Fill out the form:
+
    - **Type**: Select `stdio` (since you're running a command)
    - **Name**: `milvus`
    - **Command**: `/PATH/TO/uv --directory /path/to/mcp-server-milvus/src/mcp_server_milvus run server.py --milvus-uri http://127.0.0.1:19530`
-   
+
    > ⚠️ Note: Use `127.0.0.1` instead of `localhost` to avoid potential DNS resolution issues.
 
 ### Option 2: Using Project-specific Configuration (Recommended)
@@ -86,11 +97,13 @@ This MCP server can be used with various LLM applications that support the Model
 Create a `.cursor/mcp.json` file in your project root:
 
 1. Create the `.cursor` directory in your project root:
+
    ```bash
    mkdir -p /path/to/your/project/.cursor
    ```
 
 2. Create a `mcp.json` file with the following content:
+
    ```json
    {
      "mcpServers": {
@@ -129,6 +142,7 @@ The server provides the following tools:
 ### Search and Query Operations
 
 - `milvus_text_search`: Search for documents using full text search
+
   - Parameters:
     - `collection_name`: Name of collection to search
     - `query_text`: Text to search for
@@ -137,6 +151,7 @@ The server provides the following tools:
     - `drop_ratio`: Proportion of low-frequency terms to ignore (0.0-1.0)
 
 - `milvus_vector_search`: Perform vector similarity search on a collection
+
   - Parameters:
     - `collection_name`: Name of collection to search
     - `vector`: Query vector
@@ -157,12 +172,14 @@ The server provides the following tools:
 - `milvus_list_collections`: List all collections in the database
 
 - `milvus_create_collection`: Create a new collection with specified schema
+
   - Parameters:
     - `collection_name`: Name for the new collection
     - `collection_schema`: Collection schema definition
     - `index_params`: Optional index parameters
 
 - `milvus_load_collection`: Load a collection into memory for search and query
+
   - Parameters:
     - `collection_name`: Name of collection to load
     - `replica_number`: Number of replicas (default: 1)
@@ -174,6 +191,7 @@ The server provides the following tools:
 ### Data Operations
 
 - `milvus_insert_data`: Insert data into a collection
+
   - Parameters:
     - `collection_name`: Name of collection
     - `data`: Dictionary mapping field names to lists of values
@@ -199,14 +217,16 @@ uv run server.py --milvus-uri http://localhost:19530
 
 ## Examples
 
-### Using Claude Desktop 
+### Using Claude Desktop
 
 #### Example 1: Listing Collections
 
 ```
 What are the collections I have in my Milvus DB?
 ```
-Claude will then use MCP to check this information on your Milvus DB. 
+
+Claude will then use MCP to check this information on your Milvus DB.
+
 ```
 I'll check what collections are available in your Milvus database.
 
