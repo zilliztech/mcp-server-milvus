@@ -1,5 +1,6 @@
 import argparse
 import os
+import json
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 from dotenv import load_dotenv
@@ -722,6 +723,20 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
     success = await connector.use_database(db_name)
     
     return f"Switched to database '{db_name}' successfully"
+
+@mcp.tool()
+async def milvus_get_collection_info(collection_name: str, ctx: Context = None) -> str:
+    """
+    List the statistics collected on a specific collection
+
+    Args:
+        collection_name: Name of collection to load
+    """
+    connector = ctx.request_context.lifespan_context.connector
+    collection_info = await connector.get_collection_info(collection_name)
+    info_str = json.dumps(collection_info, indent=2)
+    return info_str
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
