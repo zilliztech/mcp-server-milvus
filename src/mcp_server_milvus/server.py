@@ -735,8 +735,7 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
     connector = ctx.request_context.lifespan_context.connector
     collection_info = await connector.get_collection_info(collection_name)
     info_str = json.dumps(collection_info, indent=2)
-    return info_str
-
+    return f"Collection information:\n{info_str}"
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
