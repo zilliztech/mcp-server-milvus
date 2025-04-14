@@ -100,7 +100,6 @@ class MilvusConnector:
             limit: Maximum number of results
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
-            filter_expr: Optional filter expression
         """
         try:
             search_params = {"metric_type": metric_type, "params": {"nprobe": 10}}
@@ -112,7 +111,6 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-
             )
             return results
         except Exception as e:
@@ -134,7 +132,6 @@ class MilvusConnector:
             collection_name: Name of collection to search
             vector: Query vector
             vector_field: Field containing vectors to search
-            filter_expr: Filter expression for metadata
             limit: Maximum number of results
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
@@ -264,7 +261,6 @@ class MilvusConnector:
             limit: Maximum number of results per query
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
-            filter_expr: Optional filter expression
             search_params: Additional search parameters
         """
         try:
@@ -573,7 +569,6 @@ async def milvus_vector_search(
     limit: int = 5,
     output_fields: Optional[list[str]] = None,
     metric_type: str = "COSINE",
-    filter_expr: Optional[str] = None,
     ctx: Context = None,
 ) -> str:
     """
@@ -586,7 +581,6 @@ async def milvus_vector_search(
         limit: Maximum number of results
         output_fields: Fields to include in results
         metric_type: Distance metric (COSINE, L2, IP)
-        filter_expr: Optional filter expression
     """
     connector = ctx.request_context.lifespan_context.connector
     results = await connector.vector_search(
@@ -596,7 +590,6 @@ async def milvus_vector_search(
         limit=limit,
         output_fields=output_fields,
         metric_type=metric_type,
-        filter_expr=filter_expr,
     )
 
     output = f"Vector search results for '{collection_name}':\n\n"
