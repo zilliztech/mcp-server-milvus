@@ -727,7 +727,7 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
 @mcp.tool()
 async def milvus_get_collection_info(collection_name: str, ctx: Context = None) -> str:
     """
-    List the statistics collected on a specific collection
+    Lists detailed information about a specific collection
 
     Args:
         collection_name: Name of collection to load
