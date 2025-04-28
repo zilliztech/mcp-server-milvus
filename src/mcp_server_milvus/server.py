@@ -715,7 +715,7 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
 async def milvus_get_collection_info(collection_name: str, ctx: Context = None) -> str:
     """
     Lists detailed information about a specific collection
-
+    
     Args:
         collection_name: Name of collection to load
     """
