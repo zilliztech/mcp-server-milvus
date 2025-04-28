@@ -140,20 +140,7 @@ class MilvusConnector:
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
         """
-        try:
-            search_params = {"metric_type": metric_type, "params": {"nprobe": 10}}
-
-            results = self.client.search(
-                collection_name=collection_name,
-                data=[vector],
-                anns_field=vector_field,
-                search_params=search_params,
-                limit=limit,
-                output_fields=output_fields,
-            )
-            return results
-        except Exception as e:
-            raise ValueError(f"Hybrid search failed: {str(e)}")
+        raise NotImplementedError('This method is not yet supported.') 
 
     async def create_collection(
         self,
