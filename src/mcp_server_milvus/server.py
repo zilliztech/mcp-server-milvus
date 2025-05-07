@@ -89,6 +89,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
+        filter_expr: Optional[str] = None, 
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -112,7 +113,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-
+                filter=filter_expr,
             )
             return results
         except Exception as e:
@@ -126,6 +127,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
+        filter_expr: Optional[str] = None, 
     ) -> list[dict]:
         """
         Perform hybrid search combining vector similarity and attribute filtering.
@@ -138,6 +140,7 @@ class MilvusConnector:
             limit: Maximum number of results
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
+            filter_expr: Optional filter expression
         """
         raise NotImplementedError('This method is not yet supported.') 
 
@@ -239,6 +242,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
+        filter_expr: Optional[str] = None, 
         search_params: Optional[dict[str, Any]] = None,
     ) -> list[list[dict]]:
         """
@@ -265,6 +269,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
+                filter=filter_expr
             )
             return results
         except Exception as e:
