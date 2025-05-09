@@ -17,7 +17,6 @@ class MilvusConnector:
     def __init__(
         self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"
     ):
-        load_dotenv()
         self.uri = uri
         self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
