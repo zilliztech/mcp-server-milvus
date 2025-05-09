@@ -118,7 +118,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                filter_expr=filter_expr,
+                filter=filter_expr,
             )
             return results
         except Exception as e:
