@@ -147,8 +147,8 @@ class MilvusConnector:
             vector_field: Field name for vector search
             limit: Maximum number of results
             output_fields: Fields to return in results
-            text_params: BM25 parameters
-            vector_params: Vector search parameters
+            sparse_metric_type: Sparse distance metric("BM25")
+            dense_metric_type: Dense distance metric("IP","COSINE","L2")
         """
         try:
             sparse_params = {"metric_type": sparse_metric_type, "params": {"nprobe": 10}}
@@ -653,9 +653,12 @@ async def milvus_hybrid_search(
         collection_name: Name of the collection to search
         query_text: Text query for full text search
         text_field: Field for text search
+        vector: Query Vector for dense vector search
         vector_field: Field containing vectors
         limit: Maximum number of results
         output_fields: Fields to include in results
+        sparse_metric_type: Sparse distance metric("BM25")
+        dense_metric_type: Dense distance metric("IP","COSINE","L2")
     """
     connector = ctx.request_context.lifespan_context.connector
 
@@ -798,7 +801,7 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
     parser.add_argument("--milvus-uri", type=str,
-                        default="http://127.0.0.1:19530", help="Milvus server URI")
+                        default="http://localhost:19530", help="Milvus server URI")
     parser.add_argument("--milvus-token", type=str,
                         default=None, help="Milvus authentication token")
     parser.add_argument("--milvus-db", type=str,
