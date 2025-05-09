@@ -1,11 +1,16 @@
 import argparse
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 
 from mcp.server.fastmcp import Context, FastMCP
-from pymilvus import DataType, MilvusClient
+from pymilvus import (
+    MilvusClient,
+    DataType,
+    AnnSearchRequest,
+    RRFRanker,
+)
 
 
 class MilvusConnector:
@@ -15,7 +20,7 @@ class MilvusConnector:
         self.uri = uri
         self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
-
+    
     async def list_collections(self) -> list[str]:
         """List all collections in the database."""
         try:
@@ -89,6 +94,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
+        filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -112,7 +118,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-
+                filter_expr=filter_expr,
             )
             return results
         except Exception as e:
@@ -121,26 +127,60 @@ class MilvusConnector:
     async def hybrid_search(
         self,
         collection_name: str,
-        vector: list[float],
+        query_text: str,
+        text_field: str,
+        vector: List[float],
         vector_field: str,
-        limit: int = 5,
+        limit: int,
         output_fields: Optional[list[str]] = None,
-        metric_type: str = "COSINE",
+        sparse_metric_type: str = "BM25",
+        dense_metric_type: str = "IP",
     ) -> list[dict]:
         """
-        Perform hybrid search combining vector similarity and attribute filtering.
+        Perform hybrid search combining BM25 text search and vector search with RRF ranking.
 
         Args:
             collection_name: Name of collection to search
-            vector: Query vector
-            vector_field: Field containing vectors to search
-            filter_expr: Filter expression for metadata
+            query_text: Text query for BM25 search
+            text_field: Field name for text search
+            vector: Query vector for dense vector search
+            vector_field: Field name for vector search
             limit: Maximum number of results
             output_fields: Fields to return in results
-            metric_type: Distance metric (COSINE, L2, IP)
+            text_params: BM25 parameters
+            vector_params: Vector search parameters
         """
-        raise NotImplementedError('This method is not yet supported.') 
+        try:
+            sparse_params = {"metric_type": sparse_metric_type, "params": {"nprobe": 10}}
+            dense_params = {"metric_type": dense_metric_type, "params": {"drop_ratio_build": 0.2}}
+            # BM25 search request
+            sparse_request = AnnSearchRequest(
+                data=[query_text],
+                anns_field=text_field,
+                param=sparse_params,
+                limit=limit * 2,
+            )
+            # dense vector search request
+            dense_request = AnnSearchRequest(
+                data=[vector],
+                anns_field=vector_field,
+                param=dense_params,
+                limit=limit * 2,
+            )
+            # hybrid search
+            results = self.client.hybrid_search(
+                collection_name=collection_name,
+                reqs=[sparse_request, dense_request],
+                ranker=RRFRanker(60),
+                limit=limit,
+                output_fields=output_fields,
+            )
 
+            return results
+            
+        except Exception as e:
+            raise ValueError(f"Hybrid search failed: {str(e)}")
+        
     async def create_collection(
         self,
         collection_name: str,
@@ -594,6 +634,51 @@ async def milvus_vector_search(
 
 
 @mcp.tool()
+async def milvus_hybrid_search(
+    collection_name: str,
+    query_text: str,
+    text_field: str,
+    vector: list[float],
+    vector_field: str,
+    limit: int = 5,
+    output_fields: Optional[list[str]] = None,
+    sparse_metric_type: str = "BM25",
+    dense_metric_type: str = "IP",
+    ctx: Context = None,
+) -> str:
+    """
+    Perform hybrid search combining text and vector search.
+
+    Args:
+        collection_name: Name of the collection to search
+        query_text: Text query for full text search
+        text_field: Field for text search
+        vector_field: Field containing vectors
+        limit: Maximum number of results
+        output_fields: Fields to include in results
+    """
+    connector = ctx.request_context.lifespan_context.connector
+
+    results = await connector.hybrid_search(
+        collection_name=collection_name,
+        query_text=query_text,
+        text_field=text_field,
+        vector=vector,
+        vector_field=vector_field,
+        limit=limit,
+        output_fields=output_fields,
+        sparse_metric_type=sparse_metric_type,
+        dense_metric_type=dense_metric_type,
+    )
+
+    output = (f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n")
+    for result in results:
+        output += f"{result}\n\n"
+
+    return output
+
+
+@mcp.tool()
 async def milvus_create_collection(
     collection_name: str,
     collection_schema: dict[str, Any],
@@ -713,7 +798,7 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
     parser.add_argument("--milvus-uri", type=str,
-                        default="http://localhost:19530", help="Milvus server URI")
+                        default="http://127.0.0.1:19530", help="Milvus server URI")
     parser.add_argument("--milvus-token", type=str,
                         default=None, help="Milvus authentication token")
     parser.add_argument("--milvus-db", type=str,
@@ -729,5 +814,4 @@ if __name__ == "__main__":
         "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
         "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
-
     mcp.run()
