@@ -60,7 +60,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 - **Usage:**
 
   ```bash
-  uv run src/mcp_server_milvus/server.py --sse --port 8000
+  uv run src/mcp_server_milvus/server.py --sse --milvus-uri http://localhost:19530 --port 8000
   ```
 
   - `--sse`: Enables SSE mode.
