@@ -2,7 +2,7 @@ import argparse
 import os
 import json
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 
 from mcp.server.fastmcp import Context, FastMCP
