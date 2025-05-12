@@ -188,6 +188,10 @@ The server provides the following tools:
   - Parameters:
     - `collection_name`: Name of collection to release
 
+- `milvus_get_collection_info`: Lists detailed information like schema, properties, collection ID, and other metadata of a specific collection.
+  - Parameters:
+    - `collection_name`:  Name of the collection to get detailed information about
+    
 ### Data Operations
 
 - `milvus_insert_data`: Insert data into a collection
