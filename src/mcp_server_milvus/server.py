@@ -1,17 +1,18 @@
 import argparse
 import os
-import json
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server import FastMCP
+from mcp.server.fastmcp import Context
 from pymilvus import (
     MilvusClient,
     DataType,
     AnnSearchRequest,
     RRFRanker,
 )
+
 
 class MilvusConnector:
     def __init__(
@@ -94,7 +95,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None, 
+        filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -118,7 +119,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                filter=filter_expr,
+                filter_expr=filter_expr,
             )
             return results
         except Exception as e:
@@ -177,7 +178,7 @@ class MilvusConnector:
             )
 
             return results
-            
+
         except Exception as e:
             raise ValueError(f"Hybrid search failed: {str(e)}")
 
@@ -279,7 +280,6 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None, 
         search_params: Optional[dict[str, Any]] = None,
     ) -> list[list[dict]]:
         """
@@ -306,7 +306,6 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                filter=filter_expr
             )
             return results
         except Exception as e:
@@ -468,7 +467,7 @@ class MilvusConnector:
             return self.client.get_load_state(collection_name)
         except Exception as e:
             raise ValueError(f"Failed to get loading progress: {str(e)}")
-        
+
     async def list_databases(self) -> list[str]:
         """List all databases in the Milvus instance."""
         try:
@@ -478,15 +477,15 @@ class MilvusConnector:
 
     async def use_database(self, db_name: str) -> bool:
         """Switch to a different database.
-        
+
         Args:
             db_name: Name of the database to use
         """
         try:
             # Create a new client with the specified database
             self.client = MilvusClient(
-                uri=self.uri, 
-                token=self.token, 
+                uri=self.uri,
+                token=self.token,
                 db_name=db_name
             )
             return True
@@ -788,27 +787,14 @@ async def milvus_list_databases(ctx: Context = None) -> str:
 async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
     """
     Switch to a different database.
-    
+
     Args:
         db_name: Name of the database to use
     """
     connector = ctx.request_context.lifespan_context.connector
     success = await connector.use_database(db_name)
-    
-    return f"Switched to database '{db_name}' successfully"
 
-@mcp.tool()
-async def milvus_get_collection_info(collection_name: str, ctx: Context = None) -> str:
-    """
-    Lists detailed information about a specific collection
-    
-    Args:
-        collection_name: Name of collection to load
-    """
-    connector = ctx.request_context.lifespan_context.connector
-    collection_info = await connector.get_collection_info(collection_name)
-    info_str = json.dumps(collection_info, indent=2)
-    return f"Collection information:\n{info_str}"
+    return f"Switched to database '{db_name}' successfully"
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
@@ -818,6 +804,10 @@ def parse_arguments():
                         default=None, help="Milvus authentication token")
     parser.add_argument("--milvus-db", type=str,
                         default="default", help="Milvus database name")
+    parser.add_argument("--sse", action="store_true",
+                        help="Enable SSE mode")
+    parser.add_argument("--port", type=int,
+                        default=8000, help="Port number for SSE server")
     return parser.parse_args()
 
 
@@ -829,5 +819,8 @@ if __name__ == "__main__":
         "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
         "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
-
-    mcp.run()
+    if args.sse:
+        mcp.port = args.port
+        mcp.run(transport="sse")
+    else:
+        mcp.run()
