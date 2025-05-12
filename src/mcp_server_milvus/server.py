@@ -6,8 +6,12 @@ from typing import Any, AsyncIterator, Optional
 from dotenv import load_dotenv
 
 from mcp.server.fastmcp import Context, FastMCP
-from pymilvus import DataType, MilvusClient
-
+from pymilvus import (
+    MilvusClient,
+    DataType,
+    AnnSearchRequest,
+    RRFRanker,
+)
 
 class MilvusConnector:
     def __init__(
