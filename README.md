@@ -39,6 +39,52 @@ uv run src/mcp_server_milvus/server.py
 
 ### Important: the .env file will have higher priority than the command line arguments.
 
+### Running Modes
+
+The server supports two running modes: **stdio** (default) and **SSE** (Server-Sent Events).
+
+### Stdio Mode (Default)
+
+- **Description**: Communicates with the client via standard input/output. This is the default mode if no mode is specified.
+
+- Usage:
+
+  ```bash
+  uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
+  ```
+
+### SSE Mode
+
+- **Description**: Uses HTTP Server-Sent Events for communication. This mode allows multiple clients to connect via HTTP and is suitable for web-based applications.
+
+- **Usage:**
+
+  ```bash
+  uv run src/mcp_server_milvus/server.py --sse --port 8000
+  ```
+
+  - `--sse`: Enables SSE mode.
+  - `--port`: Specifies the port for the SSE server (default: 8000).
+
+- **Debugging in SSE Mode:**
+
+  If you want to debug in SSE mode, after starting the SSE service, enter the following command:
+
+  ```bash
+  mcp dev src/mcp_server_milvus/server.py
+  ```
+
+  The output will be similar to:
+
+  ```plaintext
+  % mcp dev src/mcp_server_milvus/merged_server.py
+  Starting MCP inspector...
+  ⚙️ Proxy server listening on port 6277
+  🔍 MCP Inspector is up and running at http://127.0.0.1:6274 🚀
+  ```
+
+  You can then access the MCP Inspector at `http://127.0.0.1:6274` for testing.
+
 ## Supported Applications
 
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
@@ -69,6 +115,11 @@ This MCP server can be used with various LLM applications that support the Model
         "--milvus-uri",
         "http://localhost:19530"
       ]
+    },
+    "milvus-sse": {
+      "url": "http://your_sse_url:port/sse",
+      "disabled": false,
+      "autoApprove": []
     }
   }
 }
@@ -83,14 +134,24 @@ This MCP server can be used with various LLM applications that support the Model
 ### Option 1: Using Cursor Settings UI
 
 1. Go to `Cursor Settings` > `Features` > `MCP`
+
 2. Click on the `+ Add New MCP Server` button
+
 3. Fill out the form:
 
+   For `stdio` mode:
+   
    - **Type**: Select `stdio` (since you're running a command)
    - **Name**: `milvus`
    - **Command**: `/PATH/TO/uv --directory /path/to/mcp-server-milvus/src/mcp_server_milvus run server.py --milvus-uri http://127.0.0.1:19530`
-
+   
    > ⚠️ Note: Use `127.0.0.1` instead of `localhost` to avoid potential DNS resolution issues.
+   
+   For `sse` mode:
+   
+   - **Type**: Select `sse` (since you're running a command)
+   - **Name**: `milvus-sse`
+   - **Server URL**: http://your_sse_url:port/sse
 
 ### Option 2: Using Project-specific Configuration (Recommended)
 
@@ -118,6 +179,11 @@ Create a `.cursor/mcp.json` file in your project root:
            "http://127.0.0.1:19530"
          ]
        }
+       "milvus-sse": {
+         "url": "http://your_sse_url:port/sse",
+         "disabled": false,
+         "autoApprove": []
+       }
      }
    }
    ```
@@ -131,7 +197,7 @@ After adding the server, you may need to press the refresh button in the MCP set
 To verify that Cursor has successfully integrated with your Milvus MCP server:
 
 1. Open Cursor Settings > Features > MCP
-2. Check that "Milvus" appears in the list of MCP servers
+2. Check that "milvus" and "milvus-sse" appears in the list of MCP servers
 3. Verify that the tools are listed (e.g., milvus_list_collections, milvus_vector_search, etc.)
 4. If the server is enabled but shows an error, check the Troubleshooting section below
 
@@ -149,9 +215,7 @@ The server provides the following tools:
     - `limit`: Maximum results (default: 5)
     - `output_fields`: Fields to include in results
     - `drop_ratio`: Proportion of low-frequency terms to ignore (0.0-1.0)
-
 - `milvus_vector_search`: Perform vector similarity search on a collection
-
   - Parameters:
     - `collection_name`: Name of collection to search
     - `vector`: Query vector
@@ -159,7 +223,17 @@ The server provides the following tools:
     - `limit`: Maximum results (default: 5)
     - `output_fields`: Fields to include in results
     - `metric_type`: Distance metric (COSINE, L2, IP) (default: "COSINE")
-
+- `milvus_hybrid_search`: Perform hybrid search on a collection
+  - Parameters:
+    - `collection_name`: Name of collection to search
+    - `query_text`: Text query for BM25 search
+    - `text_field`: Field name for text search
+    - `vector`: Query vector
+    - `vector_field`: Field containing vectors to search
+    - `limit`: Maximum results
+    - `output_fields`: Fields to include in results
+    - `sparse_metric_type`: Metric type for sparse search (default: "BM25")
+    - `dense_metric_type`: Metric type for dense search(COSINE, L2, IP) (default: "IP")
 - `milvus_query`: Query collection using filter expressions
   - Parameters:
     - `collection_name`: Name of collection to query
@@ -188,10 +262,6 @@ The server provides the following tools:
   - Parameters:
     - `collection_name`: Name of collection to release
 
-- `milvus_get_collection_info`: Lists detailed information like schema, properties, collection ID, and other metadata of a specific collection.
-  - Parameters:
-    - `collection_name`:  Name of the collection to get detailed information about
-    
 ### Data Operations
 
 - `milvus_insert_data`: Insert data into a collection
