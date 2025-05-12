@@ -147,8 +147,8 @@ class MilvusConnector:
             vector_field: Field name for vector search
             limit: Maximum number of results
             output_fields: Fields to return in results
-            text_params: BM25 parameters
-            vector_params: Vector search parameters
+            sparse_metric_type: Metric type for sparse search
+            dense_metric_type: Metric type for dense search
         """
         try:
             sparse_params = {"metric_type": sparse_metric_type, "params": {"nprobe": 10}}
@@ -652,12 +652,15 @@ async def milvus_hybrid_search(
     Perform hybrid search combining text and vector search.
 
     Args:
-        collection_name: Name of the collection to search
-        query_text: Text query for full text search
-        text_field: Field for text search
-        vector_field: Field containing vectors
+        collection_name: Name of collection to search
+        query_text: Text query for BM25 search
+        text_field: Field name for text search
+        vector: Query vector for dense vector search
+        vector_field: Field name for vector search
         limit: Maximum number of results
-        output_fields: Fields to include in results
+        output_fields: Fields to return in results
+        sparse_metric_type: Metric type for sparse search
+        dense_metric_type: Metric type for dense search
     """
     connector = ctx.request_context.lifespan_context.connector
 
