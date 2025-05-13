@@ -95,12 +95,39 @@ This MCP server can be used with various LLM applications that support the Model
 
 ## Usage with Claude Desktop
 
-1. Install Claude Desktop from https://claude.ai/download
-2. Open your Claude Desktop configuration:
+### Configuration for Different Modes
 
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+#### SSE Mode Configuration
 
-3. Add the following configuration:
+Follow these steps to configure Claude Desktop for SSE mode:
+
+1. Install Claude Desktop from https://claude.ai/download.
+2. Open your Claude Desktop configuration file:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+3. Add the following configuration for SSE mode:
+
+```json
+{
+  "mcpServers": {
+    "milvus-sse": {
+      "url": "http://your_sse_host:port/sse",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+4. Restart Claude Desktop to apply the changes.
+
+#### Stdio Mode Configuration
+
+For stdio mode, follow these steps:
+
+1. Install Claude Desktop from https://claude.ai/download.
+2. Open your Claude Desktop configuration file:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+3. Add the following configuration for stdio mode:
 
 ```json
 {
@@ -115,90 +142,82 @@ This MCP server can be used with various LLM applications that support the Model
         "--milvus-uri",
         "http://localhost:19530"
       ]
-    },
-    "milvus-sse": {
-      "url": "http://your_sse_host:port/sse",
-      "disabled": false,
-      "autoApprove": []
     }
   }
 }
 ```
 
-4. Restart Claude Desktop
+4. Restart Claude Desktop to apply the changes.
 
 ## Usage with Cursor
 
-[Cursor also supports MCP](https://docs.cursor.com/context/model-context-protocol) tools. You can add the Milvus MCP server to Cursor in two ways:
+[Cursor also supports MCP](https://docs.cursor.com/context/model-context-protocol) tools. You can integrate your Milvus MCP server with Cursor by following these steps:
 
-### Option 1: Using Cursor Settings UI
+### Integration Steps
 
-1. Go to `Cursor Settings` > `Features` > `MCP`
+1. Open `Cursor Settings` > `MCP`
+2. Click on `Add new global MCP server`
+3. After clicking, it will automatically redirect you to the `mcp.json` file, which will be created if it doesn’t exist
 
-2. Click on the `+ Add New MCP Server` button
+### Configuring the `mcp.json` File
 
-3. Fill out the form:
+#### For Stdio Mode:
 
-   For `stdio` mode:
-   
-   - **Type**: Select `stdio` (since you're running a command)
-   - **Name**: `milvus`
-   - **Command**: `/PATH/TO/uv --directory /path/to/mcp-server-milvus/src/mcp_server_milvus run server.py --milvus-uri http://127.0.0.1:19530`
-   
-   > ⚠️ Note: Use `127.0.0.1` instead of `localhost` to avoid potential DNS resolution issues.
-   
-   For `sse` mode:
-   
-   - **Type**: Select `sse` (since you're running a command)
-   - **Name**: `milvus-sse`
-   - **Server URL**: http://your_sse_host:port/sse
+Overwrite the `mcp.json` file with the following content:
 
-### Option 2: Using Project-specific Configuration (Recommended)
+```json
+{
+  "mcpServers": {
+    "milvus": {
+      "command": "/PATH/TO/uv",
+      "args": [
+        "--directory",
+        "/path/to/mcp-server-milvus/src/mcp_server_milvus",
+        "run",
+        "server.py",
+        "--milvus-uri",
+        "http://127.0.0.1:19530"
+      ]
+    }
+  }
+}
+```
 
-Create a `.cursor/mcp.json` file in your project root:
+#### For SSE Mode:
 
-1. Create the `.cursor` directory in your project root:
+1. Start the service by running the following command:
 
    ```bash
-   mkdir -p /path/to/your/project/.cursor
+   uv run src/mcp_server_milvus/server.py --sse --milvus-uri http://your_sse_host --port port
    ```
 
-2. Create a `mcp.json` file with the following content:
+   > **Note**: Replace `http://your_sse_host` with your actual SSE host address and `port` with the specific port number you’re using.
+
+2. Once the service is up and running, overwrite the `mcp.json` file with the following content:
 
    ```json
    {
-     "mcpServers": {
-       "milvus": {
-         "command": "/PATH/TO/uv",
-         "args": [
-           "--directory",
-           "/path/to/mcp-server-milvus/src/mcp_server_milvus",
-           "run",
-           "server.py",
-           "--milvus-uri",
-           "http://127.0.0.1:19530"
-         ]
+       "mcpServers": {
+         "milvus-sse": {
+           "url": "http://your_sse_host:port/sse",
+           "disabled": false,
+           "autoApprove": []
+         }
        }
-       "milvus-sse": {
-         "url": "http://your_sse_host:port/sse",
-         "disabled": false,
-         "autoApprove": []
-       }
-     }
    }
    ```
 
-3. Restart Cursor or reload the window
+### Completing the Integration
 
-After adding the server, you may need to press the refresh button in the MCP settings to populate the tool list. The Agent will automatically use the Milvus tools when relevant to your queries.
+After completing the above steps, restart Cursor or reload the window to ensure the configuration takes effect.
 
-### Verifying the Integration
+## Verifying the Integration
 
 To verify that Cursor has successfully integrated with your Milvus MCP server:
 
-1. Open Cursor Settings > Features > MCP
-2. Check that "milvus" and "milvus-sse" appears in the list of MCP servers
-3. Verify that the tools are listed (e.g., milvus_list_collections, milvus_vector_search, etc.)
+1. Open `Cursor Settings` > `MCP`
+2. Check if "milvus" or "milvus-sse" appear in the list（depending on the mode you have chosen）
+3. Confirm that the relevant tools are listed (e.g., milvus_list_collections, milvus_vector_search, etc.)
 4. If the server is enabled but shows an error, check the Troubleshooting section below
 
 ## Available Tools
