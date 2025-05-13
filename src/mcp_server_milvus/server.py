@@ -134,8 +134,6 @@ class MilvusConnector:
         vector_field: str,
         limit: int,
         output_fields: Optional[list[str]] = None,
-        sparse_metric_type: str = "BM25",
-        dense_metric_type: str = "IP",
         filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
@@ -149,26 +147,24 @@ class MilvusConnector:
             vector_field: Field name for vector search
             limit: Maximum number of results
             output_fields: Fields to return in results
-            sparse_metric_type: Metric type for sparse search
-            dense_metric_type: Metric type for dense search
             filter_expr: Optional filter expression
         """
         try:
-            sparse_params = {"metric_type": sparse_metric_type, "params": {"nprobe": 10}}
-            dense_params = {"metric_type": dense_metric_type, "params": {"drop_ratio_build": 0.2}}
+            sparse_params = {"params": {"nprobe": 10}}
+            dense_params = {"params": {"drop_ratio_build": 0.2}}
             # BM25 search request
             sparse_request = AnnSearchRequest(
                 data=[query_text],
                 anns_field=text_field,
                 param=sparse_params,
-                limit=limit * 2,
+                limit=limit,
             )
             # dense vector search request
             dense_request = AnnSearchRequest(
                 data=[vector],
                 anns_field=vector_field,
                 param=dense_params,
-                limit=limit * 2,
+                limit=limit,
             )
             # hybrid search
             results = self.client.hybrid_search(
@@ -648,8 +644,6 @@ async def milvus_hybrid_search(
     vector_field: str,
     limit: int = 5,
     output_fields: Optional[list[str]] = None,
-    sparse_metric_type: str = "BM25",
-    dense_metric_type: str = "IP",
     filter_expr: Optional[str] = None,
     ctx: Context = None,
 ) -> str:
@@ -664,8 +658,6 @@ async def milvus_hybrid_search(
         vector_field: Field name for vector search
         limit: Maximum number of results
         output_fields: Fields to return in results
-        sparse_metric_type: Metric type for sparse search
-        dense_metric_type: Metric type for dense search
         filter_expr: Optional filter expression
     """
     connector = ctx.request_context.lifespan_context.connector
@@ -678,8 +670,6 @@ async def milvus_hybrid_search(
         vector_field=vector_field,
         limit=limit,
         output_fields=output_fields,
-        sparse_metric_type=sparse_metric_type,
-        dense_metric_type=dense_metric_type,
         filter_expr=filter_expr,
     )
 
