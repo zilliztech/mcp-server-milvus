@@ -252,8 +252,6 @@ The server provides the following tools:
     - `vector_field`: Field name for vector search
     - `limit`: The maximum number of results to return
     - `output_fields`: Fields to include in results
-    - `sparse_metric_type`: Metric type for sparse search (default: "BM25")
-    - `dense_metric_type`: Metric type for dense search(COSINE, L2, IP) (default: "IP")
     - `filter_expr`: Filter expression
 - `milvus_query`: Query collection using filter expressions
   - Parameters:
