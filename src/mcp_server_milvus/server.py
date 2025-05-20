@@ -1,12 +1,17 @@
 import argparse
 import os
-import json
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
-
-from mcp.server.fastmcp import Context, FastMCP
-from pymilvus import DataType, MilvusClient
+import json
+from mcp.server import FastMCP
+from mcp.server.fastmcp import Context
+from pymilvus import (
+    MilvusClient,
+    DataType,
+    AnnSearchRequest,
+    RRFRanker,
+)
 
 
 class MilvusConnector:
@@ -90,7 +95,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None, 
+        filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -123,27 +128,58 @@ class MilvusConnector:
     async def hybrid_search(
         self,
         collection_name: str,
-        vector: list[float],
+        query_text: str,
+        text_field: str,
+        vector: List[float],
         vector_field: str,
-        limit: int = 5,
+        limit: int,
         output_fields: Optional[list[str]] = None,
-        metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None, 
+        filter_expr: Optional[str] = None,
     ) -> list[dict]:
         """
-        Perform hybrid search combining vector similarity and attribute filtering.
+        Perform hybrid search combining BM25 text search and vector search with RRF ranking.
 
         Args:
             collection_name: Name of collection to search
-            vector: Query vector
-            vector_field: Field containing vectors to search
-            filter_expr: Filter expression for metadata
+            query_text: Text query for BM25 search
+            text_field: Field name for text search
+            vector: Query vector for dense vector search
+            vector_field: Field name for vector search
             limit: Maximum number of results
             output_fields: Fields to return in results
-            metric_type: Distance metric (COSINE, L2, IP)
             filter_expr: Optional filter expression
         """
-        raise NotImplementedError('This method is not yet supported.') 
+        try:
+            sparse_params = {"params": {"nprobe": 10}}
+            dense_params = {"params": {"drop_ratio_build": 0.2}}
+            # BM25 search request
+            sparse_request = AnnSearchRequest(
+                data=[query_text],
+                anns_field=text_field,
+                param=sparse_params,
+                limit=limit,
+            )
+            # dense vector search request
+            dense_request = AnnSearchRequest(
+                data=[vector],
+                anns_field=vector_field,
+                param=dense_params,
+                limit=limit,
+            )
+            # hybrid search
+            results = self.client.hybrid_search(
+                collection_name=collection_name,
+                reqs=[sparse_request, dense_request],
+                ranker=RRFRanker(60),
+                limit=limit,
+                output_fields=output_fields,
+                filter=filter_expr,
+            )
+
+            return results
+
+        except Exception as e:
+            raise ValueError(f"Hybrid search failed: {str(e)}")
 
     async def create_collection(
         self,
@@ -243,7 +279,7 @@ class MilvusConnector:
         limit: int = 5,
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
-        filter_expr: Optional[str] = None, 
+        filter_expr: Optional[str] = None,
         search_params: Optional[dict[str, Any]] = None,
     ) -> list[list[dict]]:
         """
@@ -270,7 +306,7 @@ class MilvusConnector:
                 search_params=search_params,
                 limit=limit,
                 output_fields=output_fields,
-                filter=filter_expr
+                filter=filter_expr,
             )
             return results
         except Exception as e:
@@ -432,7 +468,7 @@ class MilvusConnector:
             return self.client.get_load_state(collection_name)
         except Exception as e:
             raise ValueError(f"Failed to get loading progress: {str(e)}")
-        
+
     async def list_databases(self) -> list[str]:
         """List all databases in the Milvus instance."""
         try:
@@ -442,15 +478,15 @@ class MilvusConnector:
 
     async def use_database(self, db_name: str) -> bool:
         """Switch to a different database.
-        
+
         Args:
             db_name: Name of the database to use
         """
         try:
             # Create a new client with the specified database
             self.client = MilvusClient(
-                uri=self.uri, 
-                token=self.token, 
+                uri=self.uri,
+                token=self.token,
                 db_name=db_name
             )
             return True
@@ -600,6 +636,51 @@ async def milvus_vector_search(
 
 
 @mcp.tool()
+async def milvus_hybrid_search(
+    collection_name: str,
+    query_text: str,
+    text_field: str,
+    vector: list[float],
+    vector_field: str,
+    limit: int = 5,
+    output_fields: Optional[list[str]] = None,
+    filter_expr: Optional[str] = None,
+    ctx: Context = None,
+) -> str:
+    """
+    Perform hybrid search combining text and vector search.
+
+    Args:
+        collection_name: Name of collection to search
+        query_text: Text query for BM25 search
+        text_field: Field name for text search
+        vector: Query vector for dense vector search
+        vector_field: Field name for vector search
+        limit: Maximum number of results
+        output_fields: Fields to return in results
+        filter_expr: Optional filter expression
+    """
+    connector = ctx.request_context.lifespan_context.connector
+
+    results = await connector.hybrid_search(
+        collection_name=collection_name,
+        query_text=query_text,
+        text_field=text_field,
+        vector=vector,
+        vector_field=vector_field,
+        limit=limit,
+        output_fields=output_fields,
+        filter_expr=filter_expr,
+    )
+
+    output = (f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n")
+    for result in results:
+        output += f"{result}\n\n"
+
+    return output
+
+
+@mcp.tool()
 async def milvus_create_collection(
     collection_name: str,
     collection_schema: dict[str, Any],
@@ -707,13 +788,13 @@ async def milvus_list_databases(ctx: Context = None) -> str:
 async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
     """
     Switch to a different database.
-    
+
     Args:
         db_name: Name of the database to use
     """
     connector = ctx.request_context.lifespan_context.connector
     success = await connector.use_database(db_name)
-    
+
     return f"Switched to database '{db_name}' successfully"
 
 @mcp.tool()
@@ -737,6 +818,10 @@ def parse_arguments():
                         default=None, help="Milvus authentication token")
     parser.add_argument("--milvus-db", type=str,
                         default="default", help="Milvus database name")
+    parser.add_argument("--sse", action="store_true",
+                        help="Enable SSE mode")
+    parser.add_argument("--port", type=int,
+                        default=8000, help="Port number for SSE server")
     return parser.parse_args()
 
 
@@ -748,5 +833,8 @@ if __name__ == "__main__":
         "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
         "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
-
-    mcp.run()
+    if args.sse:
+        mcp.port = args.port
+        mcp.run(transport="sse")
+    else:
+        mcp.run()
