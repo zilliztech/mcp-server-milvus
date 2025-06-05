@@ -4,8 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 import json
-from mcp.server import FastMCP
-from mcp.server.fastmcp import Context
+from fastmcp import FastMCP, Context
 from pymilvus import (
     MilvusClient,
     DataType,
@@ -516,7 +515,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[MilvusContext]:
         pass
 
 
-mcp = FastMCP("Milvus", lifespan=server_lifespan)
+mcp = FastMCP(name="Milvus", lifespan=server_lifespan)
 
 
 @mcp.tool()
@@ -825,7 +824,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     load_dotenv()
     args = parse_arguments()
     mcp.config = {
@@ -834,7 +833,10 @@ if __name__ == "__main__":
         "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
     if args.sse:
-        mcp.port = args.port
-        mcp.run(transport="sse")
+        mcp.run(transport="sse", port=args.port, host="0.0.0.0")
     else:
         mcp.run()
+
+
+if __name__ == "__main__":
+    main()
