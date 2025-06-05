@@ -14,9 +14,7 @@ from pymilvus import (
 
 
 class MilvusConnector:
-    def __init__(
-        self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"
-    ):
+    def __init__(self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"):
         self.uri = uri
         self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
@@ -224,15 +222,13 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to create collection: {str(e)}")
 
-    async def insert_data(
-        self, collection_name: str, data: dict[str, list[Any]]
-    ) -> dict[str, Any]:
+    async def insert_data(self, collection_name: str, data: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Insert data into a collection.
 
         Args:
             collection_name: Name of collection
-            data: Dictionary mapping field names to lists of values
+            data: List of dictionaries, each representing a record
         """
         try:
             result = self.client.insert(collection_name=collection_name, data=data)
@@ -240,9 +236,7 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Insert failed: {str(e)}")
 
-    async def delete_entities(
-        self, collection_name: str, filter_expr: str
-    ) -> dict[str, Any]:
+    async def delete_entities(self, collection_name: str, filter_expr: str) -> dict[str, Any]:
         """
         Delete entities from a collection based on filter expression.
 
@@ -251,9 +245,7 @@ class MilvusConnector:
             filter_expr: Filter expression to select entities to delete
         """
         try:
-            result = self.client.delete(
-                collection_name=collection_name, expr=filter_expr
-            )
+            result = self.client.delete(collection_name=collection_name, expr=filter_expr)
             return result
         except Exception as e:
             raise ValueError(f"Delete failed: {str(e)}")
@@ -365,22 +357,16 @@ class MilvusConnector:
             total_records = len(data[field_names[0]])
 
             for i in range(0, total_records, batch_size):
-                batch_data = {
-                    field: data[field][i : i + batch_size] for field in field_names
-                }
+                batch_data = {field: data[field][i : i + batch_size] for field in field_names}
 
-                result = self.client.insert(
-                    collection_name=collection_name, data=batch_data
-                )
+                result = self.client.insert(collection_name=collection_name, data=batch_data)
                 results.append(result)
 
             return results
         except Exception as e:
             raise ValueError(f"Bulk insert failed: {str(e)}")
 
-    async def load_collection(
-        self, collection_name: str, replica_number: int = 1
-    ) -> bool:
+    async def load_collection(self, collection_name: str, replica_number: int = 1) -> bool:
         """
         Load a collection into memory for search and query.
 
@@ -421,9 +407,7 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get query segment info: {str(e)}")
 
-    async def upsert_data(
-        self, collection_name: str, data: dict[str, list[Any]]
-    ) -> dict[str, Any]:
+    async def upsert_data(self, collection_name: str, data: dict[str, list[Any]]) -> dict[str, Any]:
         """
         Upsert data into a collection (insert or update if exists).
 
@@ -454,9 +438,7 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get index info: {str(e)}")
 
-    async def get_collection_loading_progress(
-        self, collection_name: str
-    ) -> dict[str, Any]:
+    async def get_collection_loading_progress(self, collection_name: str) -> dict[str, Any]:
         """
         Get the loading progress of a collection.
 
@@ -483,11 +465,7 @@ class MilvusConnector:
         """
         try:
             # Create a new client with the specified database
-            self.client = MilvusClient(
-                uri=self.uri,
-                token=self.token,
-                db_name=db_name
-            )
+            self.client = MilvusClient(uri=self.uri, token=self.token, db_name=db_name)
             return True
         except Exception as e:
             raise ValueError(f"Failed to switch database: {str(e)}")
@@ -672,7 +650,7 @@ async def milvus_hybrid_search(
         filter_expr=filter_expr,
     )
 
-    output = (f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n")
+    output = f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n"
     for result in results:
         output += f"{result}\n\n"
 
@@ -706,21 +684,19 @@ async def milvus_create_collection(
 
 @mcp.tool()
 async def milvus_insert_data(
-    collection_name: str, data: dict[str, list[Any]], ctx: Context = None
+    collection_name: str, data: list[dict[str, Any]], ctx: Context = None
 ) -> str:
     """
     Insert data into a collection.
 
     Args:
         collection_name: Name of collection
-        data: Dictionary mapping field names to lists of values
+        data: List of dictionaries, each representing a record
     """
     connector = ctx.request_context.lifespan_context.connector
     result = await connector.insert_data(collection_name=collection_name, data=data)
 
-    return (
-        f"Data inserted into collection '{collection_name}' with result: {str(result)}"
-    )
+    return f"Data inserted into collection '{collection_name}' with result: {str(result)}"
 
 
 @mcp.tool()
@@ -796,11 +772,12 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
 
     return f"Switched to database '{db_name}' successfully"
 
+
 @mcp.tool()
 async def milvus_get_collection_info(collection_name: str, ctx: Context = None) -> str:
     """
     Lists detailed information about a specific collection
-    
+
     Args:
         collection_name: Name of collection to load
     """
@@ -809,18 +786,18 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
     info_str = json.dumps(collection_info, indent=2)
     return f"Collection information:\n{info_str}"
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
-    parser.add_argument("--milvus-uri", type=str,
-                        default="http://localhost:19530", help="Milvus server URI")
-    parser.add_argument("--milvus-token", type=str,
-                        default=None, help="Milvus authentication token")
-    parser.add_argument("--milvus-db", type=str,
-                        default="default", help="Milvus database name")
-    parser.add_argument("--sse", action="store_true",
-                        help="Enable SSE mode")
-    parser.add_argument("--port", type=int,
-                        default=8000, help="Port number for SSE server")
+    parser.add_argument(
+        "--milvus-uri", type=str, default="http://localhost:19530", help="Milvus server URI"
+    )
+    parser.add_argument(
+        "--milvus-token", type=str, default=None, help="Milvus authentication token"
+    )
+    parser.add_argument("--milvus-db", type=str, default="default", help="Milvus database name")
+    parser.add_argument("--sse", action="store_true", help="Enable SSE mode")
+    parser.add_argument("--port", type=int, default=8000, help="Port number for SSE server")
     return parser.parse_args()
 
 
