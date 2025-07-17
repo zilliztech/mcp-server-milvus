@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 import json
+from enum import Enum
+from collections.abc import Iterable
 from fastmcp import FastMCP, Context
 from pymilvus import (
     MilvusClient,
@@ -783,7 +785,8 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
     """
     connector = ctx.request_context.lifespan_context.connector
     collection_info = await connector.get_collection_info(collection_name)
-    info_str = json.dumps(collection_info, indent=2)
+    sanitized_info = sanitize(collection_info)
+    info_str = json.dumps(sanitized_info, indent=2)
     return f"Collection information:\n{info_str}"
 
 
@@ -800,7 +803,18 @@ def parse_arguments():
     parser.add_argument("--port", type=int, default=8000, help="Port number for SSE server")
     return parser.parse_args()
 
-
+def sanitize(obj):
+    if isinstance(obj, Enum):
+        return obj.name
+    elif isinstance(obj, dict):
+        return {k: sanitize(v) for k, v in obj.items()}
+    elif isinstance(obj, str):
+        return obj
+    elif isinstance(obj, Iterable) and not isinstance(obj, str):
+        return [sanitize(i) for i in obj]
+    else:
+        return obj
+   
 def main():
     load_dotenv()
     args = parse_arguments()
