@@ -1,4 +1,5 @@
 # MCP Server for Milvus
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/zilliztech/mcp-server-milvus)](https://archestra.ai/mcp-catalog/zilliztech__mcp-server-milvus)
 
 > The Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. Whether you're building an AI-powered IDE, enhancing a chat interface, or creating custom AI workflows, MCP provides a standardized way to connect LLMs with the context they need.
 
