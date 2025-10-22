@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "milvus": {
+      "command": "/PATH/TO/uv",
+      "args": [
+        "--directory",
+        "/path/to/mcp-server-milvus/src/mcp_server_milvus",
+        "run",
+        "server.py",
+        "--milvus-uri",
+        "http://localhost:19530"
+      ]
+    }
+  }
+}
