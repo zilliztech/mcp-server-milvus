@@ -253,6 +253,16 @@ The server provides the following tools:
     - `limit`: The maximum number of results to return
     - `output_fields`: Fields to include in results
     - `filter_expr`: Filter expression
+- `milvus_text_similarity_search`: Perform text similarity search on a collection
+  > **Note**: This tool is only supported in Milvus 2.6.0 and above. And you need to set the embedding function at the Milvus server. See [Embedding Function](https://milvus.io/docs/embedding-function-overview.md#Embedding-Function-Overview) for more details.
+  - Parameters:
+    - `collection_name`: Name of collection to search
+    - `query_text`: Text query for similarity search
+    - `anns_field`: Field name for text search
+    - `limit`: The maximum number of results to return (default: 5)
+    - `output_fields`: Fields to include in results
+    - `metric_type`: Distance metric (COSINE, L2, IP) (default: "COSINE")
+    - `filter_expr`: Optional filter expression
 - `milvus_query`: Query collection using filter expressions
   - Parameters:
     - `collection_name`: Name of collection to query

@@ -122,6 +122,44 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Vector search failed: {str(e)}")
 
+    async def text_similarity_search(
+        self,
+        collection_name: str,
+        query_text: str,
+        anns_field: str,
+        limit: int = 5,
+        output_fields: Optional[list[str]] = None,
+        metric_type: str = "COSINE",
+        filter_expr: Optional[str] = None,
+    ) -> list[dict]:
+        """
+        Perform text similarity search on a collection.
+
+        Args:
+            collection_name: Name of collection to search
+            query_text: Text query for similarity search
+            anns_field: Field name for text search
+            limit: Maximum number of results
+            output_fields: Fields to return in results
+            metric_type: Distance metric (COSINE, L2, IP)
+            filter_expr: Optional filter expression
+        """
+        try:
+            search_params = {"metric_type": metric_type, "params": {"nprobe": 10}}
+
+            results = self.client.search(
+                collection_name=collection_name,
+                data=[query_text],
+                anns_field=anns_field,
+                search_params=search_params,
+                limit=limit,
+                output_fields=output_fields,
+                filter=filter_expr,
+            )
+            return results
+        except Exception as e:
+            raise ValueError(f"Text similarity search failed: {str(e)}")
+
     async def hybrid_search(
         self,
         collection_name: str,
@@ -658,6 +696,49 @@ async def milvus_hybrid_search(
 
 
 @mcp.tool()
+async def milvus_text_similarity_search(
+    collection_name: str,
+    query_text: str,
+    anns_field: str,
+    limit: int = 5,
+    output_fields: Optional[list[str]] = None,
+    metric_type: str = "COSINE",
+    filter_expr: Optional[str] = None,
+    ctx: Context = None,
+) -> str:
+    """
+    Perform text similarity search on a collection.
+
+    Args:
+        collection_name: Name of collection to search
+        query_text: Text query for similarity search
+        anns_field: Field name for text search
+        limit: Maximum number of results
+        output_fields: Fields to include in results
+        metric_type: Distance metric (COSINE, L2, IP)
+        filter_expr: Optional filter expression
+    """
+    connector = ctx.request_context.lifespan_context.connector
+    results = await connector.text_similarity_search(
+        collection_name=collection_name,
+        query_text=query_text,
+        anns_field=anns_field,
+        limit=limit,
+        output_fields=output_fields,
+        metric_type=metric_type,
+        filter_expr=filter_expr,
+    )
+
+    output = (
+        f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
+    )
+    for result in results:
+        output += f"{result}\n\n"
+
+    return output
+
+
+@mcp.tool()
 async def milvus_create_collection(
     collection_name: str,
     collection_schema: dict[str, Any],
@@ -783,7 +864,7 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
     """
     connector = ctx.request_context.lifespan_context.connector
     collection_info = await connector.get_collection_info(collection_name)
-    info_str = json.dumps(collection_info, indent=2)
+    info_str = json.dumps(collection_info, indent=2, default=list)
     return f"Collection information:\n{info_str}"
 
 
