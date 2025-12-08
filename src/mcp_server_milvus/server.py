@@ -14,7 +14,9 @@ from pymilvus import (
 
 
 class MilvusConnector:
-    def __init__(self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"):
+    def __init__(
+        self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"
+    ):
         self.uri = uri
         self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
@@ -260,7 +262,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to create collection: {str(e)}")
 
-    async def insert_data(self, collection_name: str, data: list[dict[str, Any]]) -> dict[str, Any]:
+    async def insert_data(
+        self, collection_name: str, data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Insert data into a collection.
 
@@ -274,7 +278,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Insert failed: {str(e)}")
 
-    async def delete_entities(self, collection_name: str, filter_expr: str) -> dict[str, Any]:
+    async def delete_entities(
+        self, collection_name: str, filter_expr: str
+    ) -> dict[str, Any]:
         """
         Delete entities from a collection based on filter expression.
 
@@ -283,7 +289,9 @@ class MilvusConnector:
             filter_expr: Filter expression to select entities to delete
         """
         try:
-            result = self.client.delete(collection_name=collection_name, expr=filter_expr)
+            result = self.client.delete(
+                collection_name=collection_name, expr=filter_expr
+            )
             return result
         except Exception as e:
             raise ValueError(f"Delete failed: {str(e)}")
@@ -395,16 +403,22 @@ class MilvusConnector:
             total_records = len(data[field_names[0]])
 
             for i in range(0, total_records, batch_size):
-                batch_data = {field: data[field][i : i + batch_size] for field in field_names}
+                batch_data = {
+                    field: data[field][i : i + batch_size] for field in field_names
+                }
 
-                result = self.client.insert(collection_name=collection_name, data=batch_data)
+                result = self.client.insert(
+                    collection_name=collection_name, data=batch_data
+                )
                 results.append(result)
 
             return results
         except Exception as e:
             raise ValueError(f"Bulk insert failed: {str(e)}")
 
-    async def load_collection(self, collection_name: str, replica_number: int = 1) -> bool:
+    async def load_collection(
+        self, collection_name: str, replica_number: int = 1
+    ) -> bool:
         """
         Load a collection into memory for search and query.
 
@@ -445,7 +459,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get query segment info: {str(e)}")
 
-    async def upsert_data(self, collection_name: str, data: dict[str, list[Any]]) -> dict[str, Any]:
+    async def upsert_data(
+        self, collection_name: str, data: dict[str, list[Any]]
+    ) -> dict[str, Any]:
         """
         Upsert data into a collection (insert or update if exists).
 
@@ -476,7 +492,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get index info: {str(e)}")
 
-    async def get_collection_loading_progress(self, collection_name: str) -> dict[str, Any]:
+    async def get_collection_loading_progress(
+        self, collection_name: str
+    ) -> dict[str, Any]:
         """
         Get the loading progress of a collection.
 
@@ -553,28 +571,36 @@ async def milvus_text_search(
         output_fields: Fields to include in results
         drop_ratio: Proportion of low-frequency terms to ignore (0.0-1.0)
     """
-    connector = ctx.request_context.lifespan_context.connector
-    results = await connector.search_collection(
-        collection_name=collection_name,
-        query_text=query_text,
-        limit=limit,
-        output_fields=output_fields,
-        drop_ratio=drop_ratio,
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        results = await connector.search_collection(
+            collection_name=collection_name,
+            query_text=query_text,
+            limit=limit,
+            output_fields=output_fields,
+            drop_ratio=drop_ratio,
+        )
 
-    output = f"Search results for '{query_text}' in collection '{collection_name}':\n\n"
-    for result in results:
-        output += f"{result}\n\n"
+        output = (
+            f"Search results for '{query_text}' in collection '{collection_name}':\n\n"
+        )
+        for result in results:
+            output += f"{result}\n\n"
 
-    return output
+        return output
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def milvus_list_collections(ctx: Context) -> str:
     """List all collections in the database."""
-    connector = ctx.request_context.lifespan_context.connector
-    collections = await connector.list_collections()
-    return f"Collections in database:\n{', '.join(collections)}"
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        collections = await connector.list_collections()
+        return f"Collections in database:\n{', '.join(collections)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -594,19 +620,24 @@ async def milvus_query(
         output_fields: Fields to include in results
         limit: Maximum number of results
     """
-    connector = ctx.request_context.lifespan_context.connector
-    results = await connector.query_collection(
-        collection_name=collection_name,
-        filter_expr=filter_expr,
-        output_fields=output_fields,
-        limit=limit,
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        results = await connector.query_collection(
+            collection_name=collection_name,
+            filter_expr=filter_expr,
+            output_fields=output_fields,
+            limit=limit,
+        )
 
-    output = f"Query results for '{filter_expr}' in collection '{collection_name}':\n\n"
-    for result in results:
-        output += f"{result}\n\n"
+        output = (
+            f"Query results for '{filter_expr}' in collection '{collection_name}':\n\n"
+        )
+        for result in results:
+            output += f"{result}\n\n"
 
-    return output
+        return output
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -632,22 +663,25 @@ async def milvus_vector_search(
         metric_type: Distance metric (COSINE, L2, IP)
         filter_expr: Optional filter expression
     """
-    connector = ctx.request_context.lifespan_context.connector
-    results = await connector.vector_search(
-        collection_name=collection_name,
-        vector=vector,
-        vector_field=vector_field,
-        limit=limit,
-        output_fields=output_fields,
-        metric_type=metric_type,
-        filter_expr=filter_expr,
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        results = await connector.vector_search(
+            collection_name=collection_name,
+            vector=vector,
+            vector_field=vector_field,
+            limit=limit,
+            output_fields=output_fields,
+            metric_type=metric_type,
+            filter_expr=filter_expr,
+        )
 
-    output = f"Vector search results for '{collection_name}':\n\n"
-    for result in results:
-        output += f"{result}\n\n"
+        output = f"Vector search results for '{collection_name}':\n\n"
+        for result in results:
+            output += f"{result}\n\n"
 
-    return output
+        return output
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -675,24 +709,29 @@ async def milvus_hybrid_search(
         output_fields: Fields to return in results
         filter_expr: Optional filter expression
     """
-    connector = ctx.request_context.lifespan_context.connector
+    try:
+        connector = ctx.request_context.lifespan_context.connector
 
-    results = await connector.hybrid_search(
-        collection_name=collection_name,
-        query_text=query_text,
-        text_field=text_field,
-        vector=vector,
-        vector_field=vector_field,
-        limit=limit,
-        output_fields=output_fields,
-        filter_expr=filter_expr,
-    )
+        results = await connector.hybrid_search(
+            collection_name=collection_name,
+            query_text=query_text,
+            text_field=text_field,
+            vector=vector,
+            vector_field=vector_field,
+            limit=limit,
+            output_fields=output_fields,
+            filter_expr=filter_expr,
+        )
 
-    output = f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n"
-    for result in results:
-        output += f"{result}\n\n"
+        output = (
+            f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n"
+        )
+        for result in results:
+            output += f"{result}\n\n"
 
-    return output
+        return output
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -718,24 +757,25 @@ async def milvus_text_similarity_search(
         metric_type: Distance metric (COSINE, L2, IP)
         filter_expr: Optional filter expression
     """
-    connector = ctx.request_context.lifespan_context.connector
-    results = await connector.text_similarity_search(
-        collection_name=collection_name,
-        query_text=query_text,
-        anns_field=anns_field,
-        limit=limit,
-        output_fields=output_fields,
-        metric_type=metric_type,
-        filter_expr=filter_expr,
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        results = await connector.text_similarity_search(
+            collection_name=collection_name,
+            query_text=query_text,
+            anns_field=anns_field,
+            limit=limit,
+            output_fields=output_fields,
+            metric_type=metric_type,
+            filter_expr=filter_expr,
+        )
 
-    output = (
-        f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
-    )
-    for result in results:
-        output += f"{result}\n\n"
+        output = f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
+        for result in results:
+            output += f"{result}\n\n"
 
-    return output
+        return output
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -753,14 +793,17 @@ async def milvus_create_collection(
         collection_schema: Collection schema definition
         index_params: Optional index parameters
     """
-    connector = ctx.request_context.lifespan_context.connector
-    success = await connector.create_collection(
-        collection_name=collection_name,
-        schema=collection_schema,
-        index_params=index_params,
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        success = await connector.create_collection(
+            collection_name=collection_name,
+            schema=collection_schema,
+            index_params=index_params,
+        )
 
-    return f"Collection '{collection_name}' created successfully"
+        return f"Collection '{collection_name}' created successfully"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -774,10 +817,13 @@ async def milvus_insert_data(
         collection_name: Name of collection
         data: List of dictionaries, each representing a record
     """
-    connector = ctx.request_context.lifespan_context.connector
-    result = await connector.insert_data(collection_name=collection_name, data=data)
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        result = await connector.insert_data(collection_name=collection_name, data=data)
 
-    return f"Data inserted into collection '{collection_name}' with result: {str(result)}"
+        return f"Data inserted into collection '{collection_name}' with result: {str(result)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -791,12 +837,15 @@ async def milvus_delete_entities(
         collection_name: Name of collection
         filter_expr: Filter expression to select entities to delete
     """
-    connector = ctx.request_context.lifespan_context.connector
-    result = await connector.delete_entities(
-        collection_name=collection_name, filter_expr=filter_expr
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        result = await connector.delete_entities(
+            collection_name=collection_name, filter_expr=filter_expr
+        )
 
-    return f"Entities deleted from collection '{collection_name}' with result: {str(result)}"
+        return f"Entities deleted from collection '{collection_name}' with result: {str(result)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -810,12 +859,15 @@ async def milvus_load_collection(
         collection_name: Name of collection to load
         replica_number: Number of replicas
     """
-    connector = ctx.request_context.lifespan_context.connector
-    success = await connector.load_collection(
-        collection_name=collection_name, replica_number=replica_number
-    )
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        success = await connector.load_collection(
+            collection_name=collection_name, replica_number=replica_number
+        )
 
-    return f"Collection '{collection_name}' loaded successfully with {replica_number} replica(s)"
+        return f"Collection '{collection_name}' loaded successfully with {replica_number} replica(s)"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -826,18 +878,24 @@ async def milvus_release_collection(collection_name: str, ctx: Context = None) -
     Args:
         collection_name: Name of collection to release
     """
-    connector = ctx.request_context.lifespan_context.connector
-    success = await connector.release_collection(collection_name=collection_name)
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        success = await connector.release_collection(collection_name=collection_name)
 
-    return f"Collection '{collection_name}' released successfully"
+        return f"Collection '{collection_name}' released successfully"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
 async def milvus_list_databases(ctx: Context = None) -> str:
     """List all databases in the Milvus instance."""
-    connector = ctx.request_context.lifespan_context.connector
-    databases = await connector.list_databases()
-    return f"Databases in Milvus instance:\n{', '.join(databases)}"
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        databases = await connector.list_databases()
+        return f"Databases in Milvus instance:\n{', '.join(databases)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -848,10 +906,13 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
     Args:
         db_name: Name of the database to use
     """
-    connector = ctx.request_context.lifespan_context.connector
-    success = await connector.use_database(db_name)
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        success = await connector.use_database(db_name)
 
-    return f"Switched to database '{db_name}' successfully"
+        return f"Switched to database '{db_name}' successfully"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -862,23 +923,33 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
     Args:
         collection_name: Name of collection to load
     """
-    connector = ctx.request_context.lifespan_context.connector
-    collection_info = await connector.get_collection_info(collection_name)
-    info_str = json.dumps(collection_info, indent=2, default=list)
-    return f"Collection information:\n{info_str}"
+    try:
+        connector = ctx.request_context.lifespan_context.connector
+        collection_info = await connector.get_collection_info(collection_name)
+        info_str = json.dumps(collection_info, indent=2, default=list)
+        return f"Collection information:\n{info_str}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
     parser.add_argument(
-        "--milvus-uri", type=str, default="http://localhost:19530", help="Milvus server URI"
+        "--milvus-uri",
+        type=str,
+        default="http://localhost:19530",
+        help="Milvus server URI",
     )
     parser.add_argument(
         "--milvus-token", type=str, default=None, help="Milvus authentication token"
     )
-    parser.add_argument("--milvus-db", type=str, default="default", help="Milvus database name")
+    parser.add_argument(
+        "--milvus-db", type=str, default="default", help="Milvus database name"
+    )
     parser.add_argument("--sse", action="store_true", help="Enable SSE mode")
-    parser.add_argument("--port", type=int, default=8000, help="Port number for SSE server")
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port number for SSE server"
+    )
     return parser.parse_args()
 
 
