@@ -14,7 +14,9 @@ from pymilvus import (
 
 
 class MilvusConnector:
-    def __init__(self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"):
+    def __init__(
+        self, uri: str, token: Optional[str] = None, db_name: Optional[str] = "default"
+    ):
         self.uri = uri
         self.token = token
         self.client = MilvusClient(uri=uri, token=token, db_name=db_name)
@@ -260,7 +262,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to create collection: {str(e)}")
 
-    async def insert_data(self, collection_name: str, data: list[dict[str, Any]]) -> dict[str, Any]:
+    async def insert_data(
+        self, collection_name: str, data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Insert data into a collection.
 
@@ -274,7 +278,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Insert failed: {str(e)}")
 
-    async def delete_entities(self, collection_name: str, filter_expr: str) -> dict[str, Any]:
+    async def delete_entities(
+        self, collection_name: str, filter_expr: str
+    ) -> dict[str, Any]:
         """
         Delete entities from a collection based on filter expression.
 
@@ -283,7 +289,9 @@ class MilvusConnector:
             filter_expr: Filter expression to select entities to delete
         """
         try:
-            result = self.client.delete(collection_name=collection_name, expr=filter_expr)
+            result = self.client.delete(
+                collection_name=collection_name, expr=filter_expr
+            )
             return result
         except Exception as e:
             raise ValueError(f"Delete failed: {str(e)}")
@@ -395,16 +403,22 @@ class MilvusConnector:
             total_records = len(data[field_names[0]])
 
             for i in range(0, total_records, batch_size):
-                batch_data = {field: data[field][i : i + batch_size] for field in field_names}
+                batch_data = {
+                    field: data[field][i : i + batch_size] for field in field_names
+                }
 
-                result = self.client.insert(collection_name=collection_name, data=batch_data)
+                result = self.client.insert(
+                    collection_name=collection_name, data=batch_data
+                )
                 results.append(result)
 
             return results
         except Exception as e:
             raise ValueError(f"Bulk insert failed: {str(e)}")
 
-    async def load_collection(self, collection_name: str, replica_number: int = 1) -> bool:
+    async def load_collection(
+        self, collection_name: str, replica_number: int = 1
+    ) -> bool:
         """
         Load a collection into memory for search and query.
 
@@ -445,7 +459,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get query segment info: {str(e)}")
 
-    async def upsert_data(self, collection_name: str, data: dict[str, list[Any]]) -> dict[str, Any]:
+    async def upsert_data(
+        self, collection_name: str, data: dict[str, list[Any]]
+    ) -> dict[str, Any]:
         """
         Upsert data into a collection (insert or update if exists).
 
@@ -476,7 +492,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get index info: {str(e)}")
 
-    async def get_collection_loading_progress(self, collection_name: str) -> dict[str, Any]:
+    async def get_collection_loading_progress(
+        self, collection_name: str
+    ) -> dict[str, Any]:
         """
         Get the loading progress of a collection.
 
@@ -563,7 +581,9 @@ async def milvus_text_search(
             drop_ratio=drop_ratio,
         )
 
-        output = f"Search results for '{query_text}' in collection '{collection_name}':\n\n"
+        output = (
+            f"Search results for '{query_text}' in collection '{collection_name}':\n\n"
+        )
         for result in results:
             output += f"{result}\n\n"
 
@@ -609,7 +629,9 @@ async def milvus_query(
             limit=limit,
         )
 
-        output = f"Query results for '{filter_expr}' in collection '{collection_name}':\n\n"
+        output = (
+            f"Query results for '{filter_expr}' in collection '{collection_name}':\n\n"
+        )
         for result in results:
             output += f"{result}\n\n"
 
@@ -701,7 +723,9 @@ async def milvus_hybrid_search(
             filter_expr=filter_expr,
         )
 
-        output = f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n"
+        output = (
+            f"Hybrid search results for text '{query_text}' in '{collection_name}':\n\n"
+        )
         for result in results:
             output += f"{result}\n\n"
 
@@ -745,9 +769,7 @@ async def milvus_text_similarity_search(
             filter_expr=filter_expr,
         )
 
-        output = (
-            f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
-        )
+        output = f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
         for result in results:
             output += f"{result}\n\n"
 
@@ -913,14 +935,21 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Milvus MCP Server")
     parser.add_argument(
-        "--milvus-uri", type=str, default="http://localhost:19530", help="Milvus server URI"
+        "--milvus-uri",
+        type=str,
+        default="http://localhost:19530",
+        help="Milvus server URI",
     )
     parser.add_argument(
         "--milvus-token", type=str, default=None, help="Milvus authentication token"
     )
-    parser.add_argument("--milvus-db", type=str, default="default", help="Milvus database name")
+    parser.add_argument(
+        "--milvus-db", type=str, default="default", help="Milvus database name"
+    )
     parser.add_argument("--sse", action="store_true", help="Enable SSE mode")
-    parser.add_argument("--port", type=int, default=8000, help="Port number for SSE server")
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port number for SSE server"
+    )
     return parser.parse_args()
 
 
