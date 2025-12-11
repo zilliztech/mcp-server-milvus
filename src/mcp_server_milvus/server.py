@@ -222,7 +222,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to create collection: {str(e)}")
 
-    async def insert_data(self, collection_name: str, data: list[dict[str, Any]]) -> dict[str, Any]:
+    async def insert_data(
+        self, collection_name: str, data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Insert data into a collection.
 
@@ -407,7 +409,9 @@ class MilvusConnector:
         except Exception as e:
             raise ValueError(f"Failed to get query segment info: {str(e)}")
 
-    async def upsert_data(self, collection_name: str, data: dict[str, list[Any]]) -> dict[str, Any]:
+    async def upsert_data(
+        self, collection_name: str, data: dict[str, list[Any]]
+    ) -> dict[str, Any]:
         """
         Upsert data into a collection (insert or update if exists).
 
