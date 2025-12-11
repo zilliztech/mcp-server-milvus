@@ -13,6 +13,7 @@ Before using this MCP server, ensure you have:
 - Python 3.10 or higher
 - A running [Milvus](https://milvus.io/) instance (local or remote)
 - [uv](https://github.com/astral-sh/uv) installed (recommended for running the server)
+- **Optional**: [Docker](https://www.docker.com/) (for containerized deployment with SSE transport)
 
 ## Usage
 
@@ -85,6 +86,69 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 
   You can then access the MCP Inspector at `http://127.0.0.1:6274` for testing.
 
+### Docker Mode with SSE Transport
+
+- **Description**: Run the MCP server in a Docker container with SSE transport enabled. This is ideal for production deployments, containerized environments, or when you want to avoid local Python setup.
+
+- **Building the Docker Image:**
+
+  ```bash
+  docker build -t mcp-milvus-sse -f docker/Dockerfile .
+  ```
+
+- **Running the Docker Container:**
+
+  ```bash
+  docker run -p 6280:6280 \
+    -e MILVUS_URI=http://host.docker.internal:19530 \
+    mcp-milvus-sse
+  ```
+
+  - `-p 6280:6280`: Maps the container port to your host port
+  - `-e MILVUS_URI`: Sets the Milvus connection URI (use `host.docker.internal` to connect to Milvus running on the host machine)
+
+- **Optional Environment Variables:**
+
+  You can customize the deployment with additional environment variables:
+
+  ```bash
+  docker run -p 6280:6280 \
+    -e MILVUS_URI=http://your-milvus-host:19530 \
+    -e MILVUS_TOKEN=your_token \
+    -e MILVUS_DB=your_database \
+    mcp-milvus-sse
+  ```
+
+- **Using Docker Compose:**
+
+  Create a `docker-compose.yml` file:
+
+  ```yaml
+  version: '3.8'
+  services:
+    mcp-milvus:
+      build:
+        context: .
+        dockerfile: docker/Dockerfile
+      ports:
+        - "6280:6280"
+      environment:
+        - MILVUS_URI=http://host.docker.internal:19530
+        - MILVUS_TOKEN=${MILVUS_TOKEN:-}
+        - MILVUS_DB=${MILVUS_DB:-default}
+      restart: unless-stopped
+  ```
+
+  Then run:
+
+  ```bash
+  docker-compose up -d
+  ```
+
+- **Connecting to the Dockerized SSE Server:**
+
+  Once running, the server will be accessible at `http://localhost:6280/sse`
+
 ## Supported Applications
 
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
@@ -119,6 +183,22 @@ Follow these steps to configure Claude Desktop for SSE mode:
 ```
 
 4. Restart Claude Desktop to apply the changes.
+
+**For Docker-based SSE deployment:**
+
+If you're running the MCP server in Docker, use:
+
+```json
+{
+  "mcpServers": {
+    "milvus-sse": {
+      "url": "http://localhost:6280/sse",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
 
 #### Stdio Mode Configuration
 
@@ -200,6 +280,22 @@ Overwrite the `mcp.json` file with the following content:
        "mcpServers": {
          "milvus-sse": {
            "url": "http://your_sse_host:port/sse",
+           "disabled": false,
+           "autoApprove": []
+         }
+       }
+   }
+   ```
+
+   **For Docker deployment:**
+
+   If you're running the MCP server in Docker, use:
+
+   ```json
+   {
+       "mcpServers": {
+         "milvus-sse": {
+           "url": "http://localhost:6280/sse",
            "disabled": false,
            "autoApprove": []
          }
