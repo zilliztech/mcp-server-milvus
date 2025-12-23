@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 import json
-from fastmcp import FastMCP, Context
+from mcp.server.fastmcp.server import FastMCP, Context
 from pymilvus import (
     MilvusClient,
     DataType,
@@ -167,7 +167,7 @@ class MilvusConnector:
         collection_name: str,
         query_text: str,
         text_field: str,
-        vector: List[float],
+        vector: list[float],
         vector_field: str,
         limit: int,
         output_fields: Optional[list[str]] = None,
@@ -221,42 +221,74 @@ class MilvusConnector:
     async def create_collection(
         self,
         collection_name: str,
-        schema: dict[str, Any],
-        index_params: Optional[dict[str, Any]] = None,
+        auto_id: bool = True,
+        dimension: int = 768,
+        primary_field_name: str = "id",
+        vector_field_name: str = "vector",
+        metric_type: str = "COSINE",
+        field_schema: list[dict[str, Any]] = None,
+        index_params: list[dict[str, Any]] = None,
+        **kwargs: Any
     ) -> bool:
         """
-        Create a new collection with the specified schema.
+        Create a new collection with quick setup or customized schema.
 
         Args:
             collection_name: Name for the new collection
-            schema: Collection schema definition
-            index_params: Optional index parameters
+            auto_id: whether to auto generate id, default to True
+            dimension: vector dimension, default to 768; for quick setup and will be ignored if field_schema is provided
+            primary_field_name: name of the primary field, default to "id"; for quick setup and will be ignored if field_schema is provided
+            vector_field_name: name of the vector field, default to "vector"; for quick setup and will be ignored if field_schema is provided
+            metric_type: metric type, default to "COSINE"; for quick setup and will be ignored if field_schema is provided
+            field_schema: List of field schema, each element is a dictionary with the following keys:
+                - name: name of the field
+                - type: type of the field
+                - dimension: dimension of the field
+                - index_type: index type
+            index_params: List of indexes with parameters, each element is a dictionary with the following keys:
+                - field_name: name of the field to index
+                - index_type: index type
+                - **kwargs: other optional index parameters
+                Default to None, which means no index will be created. If field_schema is not None, you will need to create index and then load collection manually after collection creation.
+            **kwargs: Additional parameters for the collection creation
         """
         try:
             # Check if collection already exists
             if collection_name in self.client.list_collections():
                 raise ValueError(f"Collection '{collection_name}' already exists")
 
+            schema_kwargs = {
+                "auto_id": auto_id,
+                "enable_dynamic_field": kwargs.get("enable_dynamic_field", True),
+            }
+            if "partition_key_isolation" in kwargs:
+                schema_kwargs["partition_key_isolation"] = kwargs["partition_key_isolation"]
+
+            if field_schema is not None:
+                schema = MilvusClient.create_schema(**schema_kwargs)
+                for field_kwargs in field_schema:
+                    field_kwargs["datatype"] = getattr(DataType, field_kwargs["datatype"].upper())
+                    schema.add_field(**field_kwargs)
+            else:
+                schema = None
+
+            built_index_params = MilvusClient.prepare_index_params()
+            if index_params is not None or len(index_params) > 0:
+                for index_kwargs in index_params:
+                    built_index_params.add_index(**index_kwargs)
+
             # Create collection
             self.client.create_collection(
                 collection_name=collection_name,
-                dimension=schema.get("dimension", 128),
-                primary_field=schema.get("primary_field", "id"),
-                id_type=schema.get("id_type", DataType.INT64),
-                vector_field=schema.get("vector_field", "vector"),
-                metric_type=schema.get("metric_type", "COSINE"),
-                auto_id=schema.get("auto_id", False),
-                enable_dynamic_field=schema.get("enable_dynamic_field", True),
-                other_fields=schema.get("other_fields", []),
+                auto_id=auto_id,
+                dimension=dimension,
+                primary_field_name=primary_field_name,
+                vector_field_name=vector_field_name,
+                metric_type=metric_type,
+                schema=schema,
+                index_params=built_index_params if index_params is not None else None,
+                **kwargs
             )
-
-            # Create index if params provided
-            if index_params:
-                self.client.create_index(
-                    collection_name=collection_name,
-                    field_name=schema.get("vector_field", "vector"),
-                    index_params=index_params,
-                )
 
             return True
         except Exception as e:
@@ -781,8 +813,14 @@ async def milvus_text_similarity_search(
 @mcp.tool()
 async def milvus_create_collection(
     collection_name: str,
-    collection_schema: dict[str, Any],
-    index_params: Optional[dict[str, Any]] = None,
+    auto_id: bool = True,
+    dimension: Optional[int] = 768,
+    primary_field_name: Optional[str] = "id",
+    vector_field_name: Optional[str] = "vector",
+    metric_type: Optional[str] = "COSINE",
+    field_schema: Optional[list[dict[str, Any]]] = None,
+    index_params: Optional[list[dict[str, Any]]] = None,
+    other_kwargs: Optional[dict[str, Any]] = None,
     ctx: Context = None,
 ) -> str:
     """
@@ -790,15 +828,32 @@ async def milvus_create_collection(
 
     Args:
         collection_name: Name for the new collection
-        collection_schema: Collection schema definition
-        index_params: Optional index parameters
+        auto_id: whether to auto generate id, default to True
+        dimension: vector dimension, default to 768; for quick setup and will be ignored if field_schema is provided
+        primary_field_name: name of the primary field, default to "id"; for quick setup and will be ignored if field_schema is provided
+        vector_field_name: name of the vector field, default to "vector"; for quick setup and will be ignored if field_schema is provided
+        metric_type: metric type, default to "COSINE"; for quick setup and will be ignored if field_schema is provided
+        field_schema: List of field schema, each element is a dictionary with the following keys:
+            - name: name of the field
+            - type: type of the field
+        index_params: Optional list of index parameters, each element is a dictionary with the following keys:
+            - field_name: name of the field to index
+            - index_type: index type
+            - **kwargs: other optional index parameters
+        other_kwargs: Additional keyword arguments for the collection creation
     """
     try:
         connector = ctx.request_context.lifespan_context.connector
         success = await connector.create_collection(
             collection_name=collection_name,
-            schema=collection_schema,
+            auto_id=auto_id,
+            dimension=dimension,
+            primary_field_name=primary_field_name,
+            vector_field_name=vector_field_name,
+            metric_type=metric_type,
+            field_schema=field_schema,
             index_params=index_params,
+            **(other_kwargs if other_kwargs is not None else {})
         )
 
         return f"Collection '{collection_name}' created successfully"
@@ -956,13 +1011,16 @@ def parse_arguments():
 def main():
     load_dotenv()
     args = parse_arguments()
+
     mcp.config = {
         "milvus_uri": os.environ.get("MILVUS_URI", args.milvus_uri),
         "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
         "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
     }
     if args.sse:
-        mcp.run(transport="sse", port=args.port, host="0.0.0.0")
+        mcp.settings.port = args.port
+        mcp.settings.host = "localhost"
+        mcp.run(transport="sse")
     else:
         mcp.run()
 

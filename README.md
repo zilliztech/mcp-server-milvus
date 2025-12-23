@@ -274,12 +274,23 @@ The server provides the following tools:
 
 - `milvus_list_collections`: List all collections in the database
 
-- `milvus_create_collection`: Create a new collection with specified schema
+- `milvus_create_collection`: Create a new collection with quick setup or customized schema
 
   - Parameters:
     - `collection_name`: Name for the new collection
-    - `collection_schema`: Collection schema definition
-    - `index_params`: Optional index parameters
+    - `auto_id`: whether to auto generate id, default to True
+    - `dimension`: vector dimension, default to 768; for quick setup and will be ignored if `field_schema` is provided
+    - `primary_field_name`: name of the primary field, default to "id"; for quick setup and will be ignored if `field_schema` is provided
+    - `vector_field_name`: name of the vector field, default to "vector"; for quick setup and will be ignored if `field_schema` is provided
+    - `metric_type`: metric type, default to "COSINE"; for quick setup and will be ignored if `field_schema` is provided
+    - `field_schema`: List of field schema, each element is a dictionary with the following keys:
+        - `name`: name of the field
+        - `type`: type of the field
+    - `index_params`: Optional list of index parameters, each element is a dictionary with the following keys:
+        - `field_name`: name of the field to index
+        - `index_type`: index type
+        - `**kwargs`: other optional index parameters
+    - `other_kwargs`: Additional keyword arguments for the collection creation
 
 - `milvus_load_collection`: Load a collection into memory for search and query
 
