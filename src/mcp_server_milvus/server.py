@@ -1003,7 +1003,18 @@ def parse_arguments():
     )
     parser.add_argument("--sse", action="store_true", help="Enable SSE mode")
     parser.add_argument(
-        "--port", type=int, default=8000, help="Port number for SSE server"
+        "--streamable-http",
+        dest="streamable_http",
+        action="store_true",
+        help="Enable Streamable HTTP transport (recommended for production)"
+    )
+    parser.add_argument(
+        "--stateless",
+        action="store_true",
+        help="Run in stateless mode (no session persistence, for Streamable HTTP only)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port number for SSE/Streamable HTTP server"
     )
     return parser.parse_args()
 
@@ -1021,6 +1032,13 @@ def main():
         mcp.settings.port = args.port
         mcp.settings.host = "localhost"
         mcp.run(transport="sse")
+    elif args.streamable_http:
+        mcp.settings.port = args.port
+        mcp.settings.host = "localhost"
+        if args.stateless:
+            mcp.settings.stateless_http = True
+            mcp.settings.json_response = True
+        mcp.run(transport="streamable-http")
     else:
         mcp.run()
 
