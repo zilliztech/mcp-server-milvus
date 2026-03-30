@@ -85,6 +85,10 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 
   You can then access the MCP Inspector at `http://127.0.0.1:6274` for testing.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/zilliztech-mcp-server-milvus).
+
 ## Supported Applications
 
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
