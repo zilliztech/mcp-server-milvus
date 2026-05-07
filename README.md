@@ -289,7 +289,7 @@ The server provides the following tools:
     - `query_text`: Text to search for
     - `limit`: The maximum number of results to return (default: 5)
     - `output_fields`: Fields to include in results
-    - `drop_ratio`: Proportion of low-frequency terms to ignore (0.0-1.0)
+    - `drop_ratio`: Proportion of low-frequency terms to ignore (0.0-1.0) (default: 0.2)
 - `milvus_vector_search`: Perform vector similarity search on a collection
   - Parameters:
     - `collection_name`: Name of collection to search
@@ -299,6 +299,8 @@ The server provides the following tools:
     - `output_fields`: Fields to include in results
     - `filter_expr`: Filter expression
     - `metric_type`: Distance metric (COSINE, L2, IP) (default: "COSINE")
+    - `radius`: Optional lower bound for range search (default: None)
+    - `range_filter`: Optional upper bound for range search (default: None)
 - `milvus_hybrid_search`: Perform hybrid search on a collection
   - Parameters:
     - `collection_name`: Name of collection to search
@@ -306,9 +308,13 @@ The server provides the following tools:
     - `text_field`: Field name for text search
     - `vector`: Vector of the text query
     - `vector_field`: Field name for vector search
-    - `limit`: The maximum number of results to return
+    - `limit`: The maximum number of results to return (default: 5)
     - `output_fields`: Fields to include in results
     - `filter_expr`: Filter expression
+    - `sparse_radius`: Optional lower bound for sparse range search (default: None)
+    - `sparse_range_filter`: Optional upper bound for sparse range search (default: None)
+    - `dense_radius`: Optional lower bound for dense range search (default: None)
+    - `dense_range_filter`: Optional upper bound for dense range search (default: None)
 - `milvus_text_similarity_search`: Perform text similarity search on a collection
   > **Note**: This tool is only supported in Milvus 2.6.0 and above. And you need to set the embedding function at the Milvus server. See [Embedding Function](https://milvus.io/docs/embedding-function-overview.md#Embedding-Function-Overview) for more details.
   - Parameters:
@@ -319,6 +325,8 @@ The server provides the following tools:
     - `output_fields`: Fields to include in results
     - `metric_type`: Distance metric (COSINE, L2, IP) (default: "COSINE")
     - `filter_expr`: Optional filter expression
+    - `radius`: Optional lower bound for range search (default: None)
+    - `range_filter`: Optional upper bound for range search (default: None)
 - `milvus_query`: Query collection using filter expressions
   - Parameters:
     - `collection_name`: Name of collection to query
