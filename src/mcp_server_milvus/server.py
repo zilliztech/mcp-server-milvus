@@ -273,7 +273,7 @@ class MilvusConnector:
                 schema = None
 
             built_index_params = MilvusClient.prepare_index_params()
-            if index_params is not None or len(index_params) > 0:
+            if index_params is not None and len(index_params) > 0:
                 for index_kwargs in index_params:
                     built_index_params.add_index(**index_kwargs)
 
