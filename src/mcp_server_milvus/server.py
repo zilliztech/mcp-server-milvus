@@ -95,6 +95,8 @@ class MilvusConnector:
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
         filter_expr: Optional[str] = None,
+        radius: Optional[float] = None,
+        range_filter: Optional[float] = None,
     ) -> list[dict]:
         """
         Perform vector similarity search on a collection.
@@ -107,9 +109,15 @@ class MilvusConnector:
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
             filter_expr: Optional filter expression
+            radius: Optional lower bound for range search
+            range_filter: Optional upper bound for range search
         """
         try:
             search_params = {"metric_type": metric_type, "params": {"nprobe": 10}}
+            if radius is not None:
+                search_params["params"]["radius"] = radius
+            if range_filter is not None:
+                search_params["params"]["range_filter"] = range_filter
 
             results = self.client.search(
                 collection_name=collection_name,
@@ -133,6 +141,8 @@ class MilvusConnector:
         output_fields: Optional[list[str]] = None,
         metric_type: str = "COSINE",
         filter_expr: Optional[str] = None,
+        radius: Optional[float] = None,
+        range_filter: Optional[float] = None,
     ) -> list[dict]:
         """
         Perform text similarity search on a collection.
@@ -145,9 +155,15 @@ class MilvusConnector:
             output_fields: Fields to return in results
             metric_type: Distance metric (COSINE, L2, IP)
             filter_expr: Optional filter expression
+            radius: Optional lower bound for range search
+            range_filter: Optional upper bound for range search
         """
         try:
             search_params = {"metric_type": metric_type, "params": {"nprobe": 10}}
+            if radius is not None:
+                search_params["params"]["radius"] = radius
+            if range_filter is not None:
+                search_params["params"]["range_filter"] = range_filter
 
             results = self.client.search(
                 collection_name=collection_name,
@@ -172,6 +188,10 @@ class MilvusConnector:
         limit: int,
         output_fields: Optional[list[str]] = None,
         filter_expr: Optional[str] = None,
+        sparse_radius: Optional[float] = None,
+        sparse_range_filter: Optional[float] = None,
+        dense_radius: Optional[float] = None,
+        dense_range_filter: Optional[float] = None,
     ) -> list[dict]:
         """
         Perform hybrid search combining BM25 text search and vector search with RRF ranking.
@@ -185,10 +205,22 @@ class MilvusConnector:
             limit: Maximum number of results
             output_fields: Fields to return in results
             filter_expr: Optional filter expression
+            sparse_radius: Optional lower bound for sparse range search
+            sparse_range_filter: Optional upper bound for sparse range search
+            dense_radius: Optional lower bound for dense range search
+            dense_range_filter: Optional upper bound for dense range search
         """
         try:
             sparse_params = {"params": {"nprobe": 10}}
             dense_params = {"params": {"drop_ratio_build": 0.2}}
+            if sparse_radius is not None:
+                sparse_params["params"]["radius"] = sparse_radius
+            if sparse_range_filter is not None:
+                sparse_params["params"]["range_filter"] = sparse_range_filter
+            if dense_radius is not None:
+                dense_params["params"]["radius"] = dense_radius
+            if dense_range_filter is not None:
+                dense_params["params"]["range_filter"] = dense_range_filter
             # BM25 search request
             sparse_request = AnnSearchRequest(
                 data=[query_text],
@@ -649,6 +681,8 @@ async def milvus_vector_search(
     output_fields: Optional[list[str]] = None,
     metric_type: str = "COSINE",
     filter_expr: Optional[str] = None,
+    radius: Optional[float] = None,
+    range_filter: Optional[float] = None,
     ctx: Context = None,
 ) -> str:
     """
@@ -662,6 +696,8 @@ async def milvus_vector_search(
         output_fields: Fields to include in results
         metric_type: Distance metric (COSINE, L2, IP)
         filter_expr: Optional filter expression
+        radius: Optional lower bound for range search
+        range_filter: Optional upper bound for range search
     """
     try:
         connector = ctx.request_context.lifespan_context.connector
@@ -673,6 +709,8 @@ async def milvus_vector_search(
             output_fields=output_fields,
             metric_type=metric_type,
             filter_expr=filter_expr,
+            radius=radius,
+            range_filter=range_filter,
         )
 
         output = f"Vector search results for '{collection_name}':\n\n"
@@ -694,6 +732,10 @@ async def milvus_hybrid_search(
     limit: int = 5,
     output_fields: Optional[list[str]] = None,
     filter_expr: Optional[str] = None,
+    sparse_radius: Optional[float] = None,
+    sparse_range_filter: Optional[float] = None,
+    dense_radius: Optional[float] = None,
+    dense_range_filter: Optional[float] = None,
     ctx: Context = None,
 ) -> str:
     """
@@ -708,6 +750,10 @@ async def milvus_hybrid_search(
         limit: Maximum number of results
         output_fields: Fields to return in results
         filter_expr: Optional filter expression
+        sparse_radius: Optional lower bound for sparse range search
+        sparse_range_filter: Optional upper bound for sparse range search
+        dense_radius: Optional lower bound for dense range search
+        dense_range_filter: Optional upper bound for dense range search
     """
     try:
         connector = ctx.request_context.lifespan_context.connector
@@ -721,6 +767,10 @@ async def milvus_hybrid_search(
             limit=limit,
             output_fields=output_fields,
             filter_expr=filter_expr,
+            sparse_radius=sparse_radius,
+            sparse_range_filter=sparse_range_filter,
+            dense_radius=dense_radius,
+            dense_range_filter=dense_range_filter,
         )
 
         output = (
@@ -743,6 +793,8 @@ async def milvus_text_similarity_search(
     output_fields: Optional[list[str]] = None,
     metric_type: str = "COSINE",
     filter_expr: Optional[str] = None,
+    radius: Optional[float] = None,
+    range_filter: Optional[float] = None,
     ctx: Context = None,
 ) -> str:
     """
@@ -756,6 +808,8 @@ async def milvus_text_similarity_search(
         output_fields: Fields to include in results
         metric_type: Distance metric (COSINE, L2, IP)
         filter_expr: Optional filter expression
+        radius: Optional lower bound for range search
+        range_filter: Optional upper bound for range search
     """
     try:
         connector = ctx.request_context.lifespan_context.connector
@@ -767,6 +821,8 @@ async def milvus_text_similarity_search(
             output_fields=output_fields,
             metric_type=metric_type,
             filter_expr=filter_expr,
+            radius=radius,
+            range_filter=range_filter,
         )
 
         output = f"Text similarity search results for '{query_text}' in '{collection_name}':\n\n"
