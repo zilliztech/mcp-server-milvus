@@ -1,0 +1,10 @@
+pull_request_rules:
+  - name: Auto merge on /lgtm and /approve
+    conditions:
+      - label=lgtm
+      - label=approved
+      - -draft
+      - -conflict
+    actions:
+      merge:
+        method: squash
