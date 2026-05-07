@@ -1,0 +1,90 @@
+name: Auto Assign Issue and PR
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  auto-assign-issue:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Assign issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const assignees = context.payload.issue.assignees || [];
+            if (assignees.length > 0) {
+              core.info("Issue already has assignees, skipping.");
+              return;
+            }
+
+            const ownerLines = fs.readFileSync("OWNERS", "utf8")
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line && !line.startsWith("#"));
+
+            if (ownerLines.length === 0) {
+              core.setFailed("OWNERS has no valid assignees.");
+              return;
+            }
+
+            const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              assignees: [picked]
+            });
+
+            core.info(`Assigned issue #${context.payload.issue.number} to ${picked}.`);
+
+  auto-assign-pr:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Assign PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const assignees = context.payload.pull_request.assignees || [];
+            if (assignees.length > 0) {
+              core.info("Pull request already has assignees, skipping.");
+              return;
+            }
+
+            const ownerLines = fs.readFileSync("OWNERS", "utf8")
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line && !line.startsWith("#"));
+
+            if (ownerLines.length === 0) {
+              core.setFailed("OWNERS has no valid assignees.");
+              return;
+            }
+
+            const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              assignees: [picked]
+            });
+
+            core.info(`Assigned PR #${context.payload.pull_request.number} to ${picked}.`);
