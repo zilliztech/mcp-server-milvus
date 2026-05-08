@@ -16,32 +16,27 @@ Before using this MCP server, ensure you have:
 
 ## Usage
 
-The recommended way to use this MCP server is to run it directly with `uv` without installation. This is how both Claude Desktop and Cursor are configured to use it in the examples below.
+The recommended way to use this MCP server is via `uvx`, which runs the server directly from [PyPI](https://pypi.org/project/mcp-server-milvus/) without requiring you to clone the repository or manually install anything:
 
-If you want to clone the repository:
+```bash
+uvx mcp-server-milvus --milvus-uri http://localhost:19530
+```
+
+Alternatively, if you prefer to work from a local clone of the repository:
 
 ```bash
 git clone https://github.com/zilliztech/mcp-server-milvus.git
 cd mcp-server-milvus
-```
-
-Then you can run the server directly:
-
-```bash
 uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
 ```
 
-Alternatively you can change the .env file in the `src/mcp_server_milvus/` directory to set the environment variables and run the server with the following command:
-
-```bash
-uv run src/mcp_server_milvus/server.py
-```
+You can also set environment variables via the `.env` file in the `src/mcp_server_milvus/` directory instead of passing command line arguments.
 
 ### Important: the .env file will have higher priority than the command line arguments.
 
 ### Running Modes
 
-The server supports two running modes: **stdio** (default) and **SSE** (Server-Sent Events).
+The server supports three running modes: **stdio** (default), **SSE** (Server-Sent Events), and **Streamable HTTP**.
 
 ### Stdio Mode (Default)
 
@@ -50,7 +45,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 - Usage:
 
   ```bash
-  uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
+  uvx mcp-server-milvus --milvus-uri http://localhost:19530
   ```
 
 ### SSE Mode
@@ -60,7 +55,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 - **Usage:**
 
   ```bash
-  uv run src/mcp_server_milvus/server.py --sse --milvus-uri http://localhost:19530 --port 8000
+  uvx mcp-server-milvus --sse --milvus-uri http://localhost:19530 --port 8000
   ```
 
   - `--sse`: Enables SSE mode.
@@ -92,7 +87,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 - **Usage:**
 
   ```bash
-  uv run src/mcp_server_milvus/server.py --streamable-http --milvus-uri http://localhost:19530 --port 8000
+  uvx mcp-server-milvus --streamable-http --milvus-uri http://localhost:19530 --port 8000
   ```
 
   - `--streamable-http`: Enables Streamable HTTP mode.
@@ -102,7 +97,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 - **Stateless Mode:**
 
   ```bash
-  uv run src/mcp_server_milvus/server.py --streamable-http --stateless --milvus-uri http://localhost:19530 --port 8000
+  uvx mcp-server-milvus --streamable-http --stateless --milvus-uri http://localhost:19530 --port 8000
   ```
 
 ## Supported Applications
@@ -167,12 +162,9 @@ For stdio mode, follow these steps:
 {
   "mcpServers": {
     "milvus": {
-      "command": "/PATH/TO/uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/path/to/mcp-server-milvus/src/mcp_server_milvus",
-        "run",
-        "server.py",
+        "mcp-server-milvus",
         "--milvus-uri",
         "http://localhost:19530"
       ]
@@ -203,12 +195,9 @@ Overwrite the `mcp.json` file with the following content:
 {
   "mcpServers": {
     "milvus": {
-      "command": "/PATH/TO/uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/path/to/mcp-server-milvus/src/mcp_server_milvus",
-        "run",
-        "server.py",
+        "mcp-server-milvus",
         "--milvus-uri",
         "http://127.0.0.1:19530"
       ]
@@ -222,7 +211,7 @@ Overwrite the `mcp.json` file with the following content:
 1. Start the service by running the following command:
 
    ```bash
-   uv run src/mcp_server_milvus/server.py --sse --milvus-uri http://your_sse_host --port port
+   uvx mcp-server-milvus --sse --milvus-uri http://your_sse_host --port port
    ```
 
    > **Note**: Replace `http://your_sse_host` with your actual SSE host address and `port` with the specific port number you’re using.
@@ -246,7 +235,7 @@ Overwrite the `mcp.json` file with the following content:
 1. Start the service:
 
    ```bash
-   uv run src/mcp_server_milvus/server.py --streamable-http --milvus-uri http://your_host --port port
+   uvx mcp-server-milvus --streamable-http --milvus-uri http://your_host --port port
    ```
 
 2. Update `mcp.json`:

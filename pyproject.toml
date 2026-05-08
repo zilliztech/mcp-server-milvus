@@ -4,6 +4,21 @@ version = "0.1.1"
 description = "MCP server for Milvus"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Zilliz", email = "admin@zilliz.com" },
+]
+keywords = ["mcp", "milvus", "vector-database", "llm", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "fastmcp>=2.14.1",
     "pymilvus>=2.5.1",
@@ -11,6 +26,11 @@ dependencies = [
     "ruff>=0.11.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/zilliztech/mcp-server-milvus"
+Repository = "https://github.com/zilliztech/mcp-server-milvus"
+"Bug Tracker" = "https://github.com/zilliztech/mcp-server-milvus/issues"
 
 [project.scripts]
 mcp-server-milvus = "mcp_server_milvus.server:main"
