@@ -85,6 +85,26 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
 
   You can then access the MCP Inspector at `http://127.0.0.1:6274` for testing.
 
+### Streamable HTTP Mode
+
+- **Description**: Uses HTTP with streaming support for communication. This is the recommended transport for production deployments and supports both stateful and stateless operation.
+
+- **Usage:**
+
+  ```bash
+  uv run src/mcp_server_milvus/server.py --streamable-http --milvus-uri http://localhost:19530 --port 8000
+  ```
+
+  - `--streamable-http`: Enables Streamable HTTP mode.
+  - `--port`: Specifies the port for the server (default: 8000).
+  - `--stateless`: Optional flag for stateless mode (no session persistence).
+
+- **Stateless Mode:**
+
+  ```bash
+  uv run src/mcp_server_milvus/server.py --streamable-http --stateless --milvus-uri http://localhost:19530 --port 8000
+  ```
+
 ## Supported Applications
 
 This MCP server can be used with various LLM applications that support the Model Context Protocol:
@@ -117,6 +137,20 @@ Follow these steps to configure Claude Desktop for SSE mode:
   }
 }
 ```
+#### Streamable HTTP Mode Configuration
+
+```json
+{
+  "mcpServers": {
+    "milvus-streamable-http": {
+      "url": "http://your_host:port/mcp",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
 
 4. Restart Claude Desktop to apply the changes.
 
@@ -207,6 +241,28 @@ Overwrite the `mcp.json` file with the following content:
    }
    ```
 
+#### For Streamable HTTP Mode:
+
+1. Start the service:
+
+   ```bash
+   uv run src/mcp_server_milvus/server.py --streamable-http --milvus-uri http://your_host --port port
+   ```
+
+2. Update `mcp.json`:
+
+   ```json
+   {
+     "mcpServers": {
+       "milvus-streamable-http": {
+         "url": "http://your_host:port/mcp",
+         "disabled": false,
+         "autoApprove": []
+       }
+     }
+   }
+   ```
+
 ### Completing the Integration
 
 After completing the above steps, restart Cursor or reload the window to ensure the configuration takes effect.
@@ -216,7 +272,7 @@ After completing the above steps, restart Cursor or reload the window to ensure 
 To verify that Cursor has successfully integrated with your Milvus MCP server:
 
 1. Open `Cursor Settings` > `MCP`
-2. Check if "milvus" or "milvus-sse" appear in the list（depending on the mode you have chosen）
+2. Check if "milvus", "milvus-sse", or "milvus-streamable-http" appear in the list (depending on the mode you have chosen)
 3. Confirm that the relevant tools are listed (e.g., milvus_list_collections, milvus_vector_search, etc.)
 4. If the server is enabled but shows an error, check the Troubleshooting section below
 
