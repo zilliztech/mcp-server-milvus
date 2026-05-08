@@ -30,6 +30,8 @@ jobs:
             const commentBody = (context.payload.comment.body || "").trim();
             const commenter = context.payload.comment.user.login;
 
+            core.setOutput("ready", "false");
+
             if (commentBody !== "/lgtm" && commentBody !== "/approve") {
               core.info("Not a supported slash command, skipping.");
               return;
@@ -100,14 +102,25 @@ jobs:
               return;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+            core.setOutput("ready", "true");
+            core.setOutput("pr_node_id", pr.node_id);
+            core.setOutput("pr_number", String(issueNumber));
+
+      - name: Enable auto-merge
+        if: steps.handle.outputs.ready == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_TOKEN }}
+          script: |
+            const prNodeId = "${{ steps.handle.outputs.pr_node_id }}";
+            const prNumber = "${{ steps.handle.outputs.pr_number }}";
 
             await github.graphql(
-              `mutation Enqueue($prId: ID!) {
-                 enqueuePullRequest(input: { pullRequestId: $prId }) {
-                   mergeQueueEntry { id }
+              `mutation EnableAutoMerge($prId: ID!) {
+                 enablePullRequestAutoMerge(input: { pullRequestId: $prId }) {
+                   pullRequest { autoMergeRequest { enabledAt } }
                  }
                }`,
-              { prId: pr.node_id }
+              { prId: prNodeId }
             );
-            core.info(`PR #${issueNumber} enqueued for merge.`);
+            core.info(`Auto-merge enabled on PR #${prNumber}.`);
