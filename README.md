@@ -496,5 +496,5 @@ If the MCP tools don't appear in Claude Desktop or Cursor:
 If you continue to experience issues:
 
 1. Check the [GitHub Issues](https://github.com/zilliztech/mcp-server-milvus/issues) for similar problems
-2. Join the [Zilliz Community Discord](https://discord.gg/zilliz) for support
+2. Join the [Milvus Community Discord](https://milvus.io/discord) for support
 3. File a new issue with detailed information about your problem
