@@ -5,7 +5,7 @@ on:
     types: [created]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Handle /lgtm and /approve
+        id: commands
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -29,9 +30,23 @@ jobs:
             const commentBody = (context.payload.comment.body || "").trim();
             const commenter = context.payload.comment.user.login;
 
+            core.setOutput("ready_to_merge", "false");
+
             // Only process exact slash commands.
             if (commentBody !== "/lgtm" && commentBody !== "/approve") {
               core.info("Not a supported slash command, skipping.");
+              return;
+            }
+
+            const owners = fs.readFileSync("OWNERS", "utf8")
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line && !line.startsWith("#"));
+
+            if (!owners.includes(commenter)) {
+              core.setFailed(
+                `@${commenter} is not listed in OWNERS and cannot use ${commentBody}.`
+              );
               return;
             }
 
@@ -54,26 +69,28 @@ jobs:
                 labels: ["lgtm"]
               });
               core.info(`Added label lgtm on PR #${issueNumber}.`);
-              return;
+            } else {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: ["approved"]
+              });
+              core.info(`Added label approved on PR #${issueNumber}.`);
             }
 
-            // /approve is restricted to users listed in OWNERS.
-            const owners = fs.readFileSync("OWNERS", "utf8")
-              .split(/\r?\n/)
-              .map((line) => line.trim())
-              .filter((line) => line && !line.startsWith("#"));
-
-            if (!owners.includes(commenter)) {
-              core.setFailed(
-                `@${commenter} is not listed in OWNERS and cannot use /approve.`
-              );
-              return;
-            }
-
-            await github.rest.issues.addLabels({
+            const { data: issue } = await github.rest.issues.get({
               owner,
               repo,
-              issue_number: issueNumber,
-              labels: ["approved"]
+              issue_number: issueNumber
             });
-            core.info(`Added label approved on PR #${issueNumber}.`);
+            const labels = issue.labels.map((label) => label.name);
+            const readyToMerge = labels.includes("lgtm") && labels.includes("approved");
+            core.setOutput("ready_to_merge", readyToMerge ? "true" : "false");
+            core.info(`PR #${issueNumber} ready_to_merge=${readyToMerge}.`);
+
+      - name: Enable GitHub auto-merge
+        if: steps.commands.outputs.ready_to_merge == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge "${{ github.event.issue.number }}" --auto --squash
