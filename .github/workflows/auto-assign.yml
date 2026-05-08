@@ -1,35 +1,28 @@
 name: Auto Assign Issue and PR
 
 on:
-  issues:
-    types: [opened]
-  pull_request_target:
-    types: [opened, reopened]
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
 
 permissions:
+  contents: read
   issues: write
   pull-requests: write
 
 jobs:
-  auto-assign-issue:
-    if: github.event_name == 'issues'
+  auto-assign-open-issues:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Assign issue
+      - name: Assign open issues
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require("fs");
-            const assignees = context.payload.issue.assignees || [];
-            if (assignees.length > 0) {
-              core.info("Issue already has assignees, skipping.");
-              return;
-            }
-
             const ownerLines = fs.readFileSync("OWNERS", "utf8")
               .split(/\r?\n/)
               .map((line) => line.trim())
@@ -40,35 +33,47 @@ jobs:
               return;
             }
 
-            const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
-            await github.rest.issues.addAssignees({
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.issue.number,
-              assignees: [picked]
+              state: "open",
+              per_page: 100
             });
 
-            core.info(`Assigned issue #${context.payload.issue.number} to ${picked}.`);
+            for (const issue of issues) {
+              if (issue.pull_request) {
+                continue;
+              }
 
-  auto-assign-pr:
-    if: github.event_name == 'pull_request_target'
+              const assignees = issue.assignees || [];
+              if (assignees.length > 0) {
+                core.info(`Issue #${issue.number} already has assignees, skipping.`);
+                continue;
+              }
+
+              const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                assignees: [picked]
+              });
+
+              core.info(`Assigned issue #${issue.number} to ${picked}.`);
+            }
+
+  auto-assign-open-prs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Assign PR
+      - name: Assign open PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require("fs");
-            const assignees = context.payload.pull_request.assignees || [];
-            if (assignees.length > 0) {
-              core.info("Pull request already has assignees, skipping.");
-              return;
-            }
-
             const ownerLines = fs.readFileSync("OWNERS", "utf8")
               .split(/\r?\n/)
               .map((line) => line.trim())
@@ -79,12 +84,27 @@ jobs:
               return;
             }
 
-            const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
-            await github.rest.issues.addAssignees({
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              assignees: [picked]
+              state: "open",
+              per_page: 100
             });
 
-            core.info(`Assigned PR #${context.payload.pull_request.number} to ${picked}.`);
+            for (const pullRequest of pullRequests) {
+              const assignees = pullRequest.assignees || [];
+              if (assignees.length > 0) {
+                core.info(`PR #${pullRequest.number} already has assignees, skipping.`);
+                continue;
+              }
+
+              const picked = ownerLines[Math.floor(Math.random() * ownerLines.length)];
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                assignees: [picked]
+              });
+
+              core.info(`Assigned PR #${pullRequest.number} to ${picked}.`);
+            }
