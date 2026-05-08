@@ -5,9 +5,10 @@ on:
     types: [created]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
   pull-requests: write
+  statuses: write
 
 jobs:
   handle-pr-commands:
@@ -32,7 +33,6 @@ jobs:
 
             core.setOutput("ready_to_merge", "false");
 
-            // Only process exact slash commands.
             if (commentBody !== "/lgtm" && commentBody !== "/approve") {
               core.info("Not a supported slash command, skipping.");
               return;
@@ -50,7 +50,6 @@ jobs:
               return;
             }
 
-            // Ensure target pull request is still open.
             const { data: pr } = await github.rest.pulls.get({
               owner,
               repo,
@@ -60,32 +59,44 @@ jobs:
               core.info(`PR #${issueNumber} is not open, skipping.`);
               return;
             }
+            const headSha = pr.head.sha;
 
-            if (commentBody === "/lgtm") {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number: issueNumber,
-                labels: ["lgtm"]
-              });
-              core.info(`Added label lgtm on PR #${issueNumber}.`);
-            } else {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number: issueNumber,
-                labels: ["approved"]
-              });
-              core.info(`Added label approved on PR #${issueNumber}.`);
-            }
+            const label = commentBody === "/lgtm" ? "lgtm" : "approved";
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              labels: [label]
+            });
+            core.info(`Added label ${label} on PR #${issueNumber}.`);
 
             const { data: issue } = await github.rest.issues.get({
               owner,
               repo,
               issue_number: issueNumber
             });
-            const labels = issue.labels.map((label) => label.name);
-            const readyToMerge = labels.includes("lgtm") && labels.includes("approved");
+            const labels = issue.labels.map((l) => l.name);
+            const hasLgtm = labels.includes("lgtm");
+            const hasApproved = labels.includes("approved");
+
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: headSha,
+              context: "merge-gate/lgtm",
+              state: hasLgtm ? "success" : "failure",
+              description: hasLgtm ? "lgtm label present." : "PR requires lgtm label."
+            });
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: headSha,
+              context: "merge-gate/approved",
+              state: hasApproved ? "success" : "failure",
+              description: hasApproved ? "approved label present." : "PR requires approved label."
+            });
+
+            const readyToMerge = hasLgtm && hasApproved;
             core.setOutput("ready_to_merge", readyToMerge ? "true" : "false");
             core.info(`PR #${issueNumber} ready_to_merge=${readyToMerge}.`);
 
