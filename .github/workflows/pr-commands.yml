@@ -106,7 +106,7 @@ jobs:
             core.setOutput("pr_node_id", pr.node_id);
             core.setOutput("pr_number", String(issueNumber));
 
-      - name: Enable auto-merge
+      - name: Enqueue PR into merge queue
         if: steps.handle.outputs.ready == 'true'
         uses: actions/github-script@v7
         with:
@@ -115,12 +115,14 @@ jobs:
             const prNodeId = "${{ steps.handle.outputs.pr_node_id }}";
             const prNumber = "${{ steps.handle.outputs.pr_number }}";
 
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
             await github.graphql(
-              `mutation EnableAutoMerge($prId: ID!) {
-                 enablePullRequestAutoMerge(input: { pullRequestId: $prId }) {
-                   pullRequest { autoMergeRequest { enabledAt } }
+              `mutation Enqueue($prId: ID!) {
+                 enqueuePullRequest(input: { pullRequestId: $prId }) {
+                   mergeQueueEntry { id }
                  }
                }`,
               { prId: prNodeId }
             );
-            core.info(`Auto-merge enabled on PR #${prNumber}.`);
+            core.info(`PR #${prNumber} enqueued for merge.`);
