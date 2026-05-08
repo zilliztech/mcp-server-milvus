@@ -5,41 +5,60 @@ on:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
 
 permissions:
-  pull-requests: read
+  pull-requests: write
+  issues: write
+  statuses: write
 
 jobs:
-  require-label-lgtm:
-    name: Require label lgtm
+  evaluate-labels:
+    name: Evaluate merge gate
     runs-on: ubuntu-latest
     steps:
-      - name: Check lgtm label
+      - name: Update merge gate statuses
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const labels = context.payload.pull_request.labels.map((label) => label.name);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const headSha = pr.head.sha;
+            let labels = pr.labels.map((l) => l.name);
 
-            if (!labels.includes("lgtm")) {
-              core.setFailed("PR requires label: lgtm.");
-              return;
+            if (context.payload.action === "synchronize") {
+              const stale = ["lgtm", "approved"].filter((l) => labels.includes(l));
+              for (const label of stale) {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pr.number,
+                  name: label
+                });
+                core.info(`Removed ${label} label after new commits on PR #${pr.number}.`);
+              }
+              labels = labels.filter((l) => !stale.includes(l));
             }
 
-            core.info("PR has required label: lgtm.");
+            const hasLgtm = labels.includes("lgtm");
+            const hasApproved = labels.includes("approved");
 
-  require-label-approved:
-    name: Require label approved
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check approved label
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const labels = context.payload.pull_request.labels.map((label) => label.name);
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: headSha,
+              context: "merge-gate/lgtm",
+              state: hasLgtm ? "success" : "failure",
+              description: hasLgtm ? "lgtm label present." : "PR requires lgtm label."
+            });
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: headSha,
+              context: "merge-gate/approved",
+              state: hasApproved ? "success" : "failure",
+              description: hasApproved ? "approved label present." : "PR requires approved label."
+            });
 
-            if (!labels.includes("approved")) {
-              core.setFailed("PR requires label: approved.");
-              return;
-            }
-
-            core.info("PR has required label: approved.");
+            core.info(
+              `PR #${pr.number} HEAD ${headSha.slice(0, 7)}: lgtm=${hasLgtm}, approved=${hasApproved}.`
+            );
