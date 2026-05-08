@@ -1,0 +1,96 @@
+name: PR Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  handle-pr-commands:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Handle /lgtm and /approve
+        id: commands
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const commentBody = (context.payload.comment.body || "").trim();
+            const commenter = context.payload.comment.user.login;
+
+            core.setOutput("ready_to_merge", "false");
+
+            // Only process exact slash commands.
+            if (commentBody !== "/lgtm" && commentBody !== "/approve") {
+              core.info("Not a supported slash command, skipping.");
+              return;
+            }
+
+            const owners = fs.readFileSync("OWNERS", "utf8")
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line && !line.startsWith("#"));
+
+            if (!owners.includes(commenter)) {
+              core.setFailed(
+                `@${commenter} is not listed in OWNERS and cannot use ${commentBody}.`
+              );
+              return;
+            }
+
+            // Ensure target pull request is still open.
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: issueNumber
+            });
+            if (pr.state !== "open") {
+              core.info(`PR #${issueNumber} is not open, skipping.`);
+              return;
+            }
+
+            if (commentBody === "/lgtm") {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: ["lgtm"]
+              });
+              core.info(`Added label lgtm on PR #${issueNumber}.`);
+            } else {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: ["approved"]
+              });
+              core.info(`Added label approved on PR #${issueNumber}.`);
+            }
+
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber
+            });
+            const labels = issue.labels.map((label) => label.name);
+            const readyToMerge = labels.includes("lgtm") && labels.includes("approved");
+            core.setOutput("ready_to_merge", readyToMerge ? "true" : "false");
+            core.info(`PR #${issueNumber} ready_to_merge=${readyToMerge}.`);
+
+      - name: Enable GitHub auto-merge
+        if: steps.commands.outputs.ready_to_merge == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge "${{ github.event.issue.number }}" --auto --squash
