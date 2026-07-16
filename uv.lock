@@ -839,6 +839,10 @@ dependencies = [
     { name = "fastmcp" },
     { name = "pymilvus" },
     { name = "python-dotenv" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "ruff" },
 ]
 
@@ -848,8 +852,10 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=2.14.1" },
     { name = "pymilvus", specifier = ">=2.5.1" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "ruff", specifier = ">=0.11.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.11.0" }]
 
 [[package]]
 name = "mdurl"
