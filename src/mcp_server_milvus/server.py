@@ -354,7 +354,7 @@ class MilvusConnector:
         """
         try:
             result = self.client.delete(
-                collection_name=collection_name, expr=filter_expr
+                collection_name=collection_name, filter=filter_expr
             )
             return result
         except Exception as e:
