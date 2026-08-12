@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional, List
 from dotenv import load_dotenv
 import json
-from mcp.server.fastmcp.server import FastMCP, Context
+from fastmcp import FastMCP, Context
 from pymilvus import (
     MilvusClient,
     DataType,
@@ -12,6 +12,11 @@ from pymilvus import (
     RRFRanker,
 )
 
+_RUNTIME_CONFIG: dict[str, Any] = {
+    "milvus_uri": "http://localhost:19530",
+	"milvus_token": None,
+	"db_name": "default",
+}
 
 class MilvusConnector:
     def __init__(
@@ -599,12 +604,10 @@ class MilvusContext:
 @asynccontextmanager
 async def server_lifespan(server: FastMCP) -> AsyncIterator[MilvusContext]:
     """Manage application lifecycle for Milvus connector."""
-    config = server.config
-
     connector = MilvusConnector(
-        uri=config.get("milvus_uri", "http://localhost:19530"),
-        token=config.get("milvus_token"),
-        db_name=config.get("db_name", "default"),
+        uri=_RUNTIME_CONFIG["milvus_uri"],
+        token=_RUNTIME_CONFIG["milvus_token"],
+        db_name=_RUNTIME_CONFIG["db_name"],
     )
 
     try:
@@ -636,7 +639,7 @@ async def milvus_text_search(
         drop_ratio: Proportion of low-frequency terms to ignore (0.0-1.0)
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         results = await connector.search_collection(
             collection_name=collection_name,
             query_text=query_text,
@@ -660,7 +663,7 @@ async def milvus_text_search(
 async def milvus_list_collections(ctx: Context) -> str:
     """List all collections in the database."""
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         collections = await connector.list_collections()
         return f"Collections in database:\n{', '.join(collections)}"
     except Exception as e:
@@ -685,7 +688,7 @@ async def milvus_query(
         limit: Maximum number of results
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         results = await connector.query_collection(
             collection_name=collection_name,
             filter_expr=filter_expr,
@@ -732,7 +735,7 @@ async def milvus_vector_search(
         range_filter: Optional upper bound for range search
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         results = await connector.vector_search(
             collection_name=collection_name,
             vector=vector,
@@ -788,7 +791,7 @@ async def milvus_hybrid_search(
         dense_range_filter: Optional upper bound for dense range search
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
 
         results = await connector.hybrid_search(
             collection_name=collection_name,
@@ -844,7 +847,7 @@ async def milvus_text_similarity_search(
         range_filter: Optional upper bound for range search
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         results = await connector.text_similarity_search(
             collection_name=collection_name,
             query_text=query_text,
@@ -899,7 +902,7 @@ async def milvus_create_collection(
         other_kwargs: Additional keyword arguments for the collection creation
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         success = await connector.create_collection(
             collection_name=collection_name,
             auto_id=auto_id,
@@ -929,7 +932,7 @@ async def milvus_insert_data(
         data: List of dictionaries, each representing a record
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         result = await connector.insert_data(collection_name=collection_name, data=data)
 
         return f"Data inserted into collection '{collection_name}' with result: {str(result)}"
@@ -949,7 +952,7 @@ async def milvus_delete_entities(
         filter_expr: Filter expression to select entities to delete
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         result = await connector.delete_entities(
             collection_name=collection_name, filter_expr=filter_expr
         )
@@ -971,7 +974,7 @@ async def milvus_load_collection(
         replica_number: Number of replicas
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         success = await connector.load_collection(
             collection_name=collection_name, replica_number=replica_number
         )
@@ -990,7 +993,7 @@ async def milvus_release_collection(collection_name: str, ctx: Context = None) -
         collection_name: Name of collection to release
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         success = await connector.release_collection(collection_name=collection_name)
 
         return f"Collection '{collection_name}' released successfully"
@@ -1002,7 +1005,7 @@ async def milvus_release_collection(collection_name: str, ctx: Context = None) -
 async def milvus_list_databases(ctx: Context = None) -> str:
     """List all databases in the Milvus instance."""
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         databases = await connector.list_databases()
         return f"Databases in Milvus instance:\n{', '.join(databases)}"
     except Exception as e:
@@ -1018,7 +1021,7 @@ async def milvus_use_database(db_name: str, ctx: Context = None) -> str:
         db_name: Name of the database to use
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         success = await connector.use_database(db_name)
 
         return f"Switched to database '{db_name}' successfully"
@@ -1035,7 +1038,7 @@ async def milvus_get_collection_info(collection_name: str, ctx: Context = None) 
         collection_name: Name of collection to load
     """
     try:
-        connector = ctx.request_context.lifespan_context.connector
+        connector = ctx.lifespan_context.connector
         collection_info = await connector.get_collection_info(collection_name)
         info_str = json.dumps(collection_info, indent=2, default=list)
         return f"Collection information:\n{info_str}"
@@ -1079,24 +1082,30 @@ def main():
     load_dotenv()
     args = parse_arguments()
 
-    mcp.config = {
-        "milvus_uri": os.environ.get("MILVUS_URI", args.milvus_uri),
-        "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
-        "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
-    }
+    _RUNTIME_CONFIG.update(
+        {
+            "milvus_uri": os.environ.get("MILVUS_URI", args.milvus_uri),
+            "milvus_token": os.environ.get("MILVUS_TOKEN", args.milvus_token),
+            "db_name": os.environ.get("MILVUS_DB", args.milvus_db),
+        }
+    )
+    
     if args.sse:
-        mcp.settings.port = args.port
-        mcp.settings.host = "localhost"
-        mcp.run(transport="sse")
-    elif args.streamable_http:
-        mcp.settings.port = args.port
-        mcp.settings.host = "localhost"
-        if args.stateless:
-            mcp.settings.stateless_http = True
-            mcp.settings.json_response = True
-        mcp.run(transport="streamable-http")
+      mcp.run(
+          transport="sse",
+          host="localhost",
+          port=args.port,
+      )
+    if args.streamable_http:
+      mcp.run(
+          transport="http",
+          host="localhost",
+          port=args.port,
+          stateless_http=args.stateless,
+          json_response=args.stateless,
+      )
     else:
-        mcp.run()
+      mcp.run()
 
 
 if __name__ == "__main__":

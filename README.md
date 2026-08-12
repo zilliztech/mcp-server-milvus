@@ -71,7 +71,7 @@ The server supports two running modes: **stdio** (default) and **SSE** (Server-S
   If you want to debug in SSE mode, after starting the SSE service, enter the following command:
 
   ```bash
-  mcp dev src/mcp_server_milvus/server.py
+  uv run fastmcp dev inspector src/mcp_server_milvus/server.py
   ```
 
   The output will be similar to:
