@@ -394,7 +394,7 @@ The server provides the following tools:
 To run the server directly:
 
 ```bash
-uv run server.py --milvus-uri http://localhost:19530
+uv run src/mcp_server_milvus/server.py --milvus-uri http://localhost:19530
 ```
 
 ## Examples
